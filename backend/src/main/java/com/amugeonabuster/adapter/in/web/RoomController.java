@@ -33,7 +33,7 @@ public class RoomController {
         CreateRoomCommand command = new CreateRoomCommand(
                 request.getHostNickname(),
                 request.getLocation(),
-                request.getMaxSwipeCount()
+                request.getCustomMenus()
         );
 
         Room room = createRoomUseCase.createRoom(command);

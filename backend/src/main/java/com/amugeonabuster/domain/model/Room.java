@@ -23,11 +23,12 @@ public class Room {
     private String winningMenu;
     private final List<Restaurant> matchedRestaurants;
     private final int maxSwipeCount;
+    private final List<String> customMenus;
 
     private static final int MAX_MEMBER_SIZE = 10;
 
     @Builder
-    public Room(String id, UUID hostId, String location, RoomStatus status, List<Member> members, List<Swipe> swipes, String winningMenu, List<Restaurant> matchedRestaurants, int maxSwipeCount) {
+    public Room(String id, UUID hostId, String location, RoomStatus status, List<Member> members, List<Swipe> swipes, String winningMenu, List<Restaurant> matchedRestaurants, int maxSwipeCount, List<String> customMenus) {
         this.id = id;
         this.hostId = hostId;
         this.location = location;
@@ -36,7 +37,14 @@ public class Room {
         this.swipes = swipes != null ? new ArrayList<>(swipes) : new ArrayList<>();
         this.winningMenu = winningMenu;
         this.matchedRestaurants = matchedRestaurants != null ? new ArrayList<>(matchedRestaurants) : new ArrayList<>();
-        this.maxSwipeCount = maxSwipeCount != 0 ? maxSwipeCount : 15;
+        if (customMenus != null && !customMenus.isEmpty()) {
+            this.customMenus = new ArrayList<>(customMenus);
+            this.maxSwipeCount = this.customMenus.size();
+        } else {
+            int limit = maxSwipeCount != 0 ? maxSwipeCount : 15;
+            this.customMenus = new ArrayList<>(DefaultMenus.MENUS.subList(0, limit));
+            this.maxSwipeCount = limit;
+        }
     }
 
     /**
@@ -52,6 +60,10 @@ public class Room {
 
     public List<Restaurant> getMatchedRestaurants() {
         return Collections.unmodifiableList(matchedRestaurants);
+    }
+
+    public List<String> getCustomMenus() {
+        return Collections.unmodifiableList(customMenus);
     }
 
     /**
@@ -147,7 +159,7 @@ public class Room {
             throw new InvalidRoomStateException("투표 진행 중인 방만 최종 매칭을 완료할 수 있습니다.");
         }
 
-        List<String> allMenus = DefaultMenus.MENUS.subList(0, this.maxSwipeCount);
+        List<String> allMenus = this.customMenus;
         List<MenuScore> scores = new ArrayList<>();
 
         for (int i = 0; i < allMenus.size(); i++) {

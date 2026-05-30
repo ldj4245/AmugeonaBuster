@@ -34,7 +34,7 @@ function App() {
   const [location, setLocation] = useState('');
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [isJoinView, setIsJoinView] = useState(false);
-  const [maxSwipeCount, setMaxSwipeCount] = useState(15);
+  const [selectedMenus, setSelectedMenus] = useState<string[]>(Object.keys(MENU_METADATA));
   
   // 게임 세션 관련 정보
   const [roomId, setRoomId] = useState<string | null>(null);
@@ -73,7 +73,10 @@ function App() {
   // 방 개설 API 송신
   const handleCreateRoom = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nickname || !location) return;
+    if (selectedMenus.length < 2) {
+      setErrorMessage('최소 2개 이상의 메뉴를 선택해야 방을 생성할 수 있습니다.');
+      return;
+    }
     setLoading(true);
     setErrorMessage(null);
 
@@ -81,7 +84,7 @@ function App() {
       const response = await fetch(BASE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hostNickname: nickname, location, maxSwipeCount })
+        body: JSON.stringify({ hostNickname: nickname, location, customMenus: selectedMenus })
       });
 
       if (!response.ok) {
@@ -381,27 +384,66 @@ function App() {
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-zinc-600 px-1">투표 카드 개수</label>
-                    <div className="grid grid-cols-3 gap-2 bg-zinc-50 p-1 rounded-lg border border-zinc-200">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex justify-between items-center px-1">
+                      <label className="text-xs font-semibold text-zinc-700">투표 메뉴 커스텀 선택</label>
+                      <span className="text-xs font-medium text-orange-600 font-mono">
+                        {selectedMenus.length}개 선택됨
+                      </span>
+                    </div>
+
+                    {/* Quick Macros */}
+                    <div className="grid grid-cols-4 gap-1.5 bg-zinc-50 p-1 rounded-lg border border-zinc-200">
                       {[
-                        { label: '⚡ 5장 (초고속)', value: 5 },
-                        { label: '🥣 10장 (일반)', value: 10 },
-                        { label: '🥩 15장 (진심)', value: 15 }
-                      ].map((opt) => (
+                        { label: '5개 선택', action: () => setSelectedMenus(Object.keys(MENU_METADATA).slice(0, 5)) },
+                        { label: '10개 선택', action: () => setSelectedMenus(Object.keys(MENU_METADATA).slice(0, 10)) },
+                        { label: '전체 선택', action: () => setSelectedMenus(Object.keys(MENU_METADATA)) },
+                        { label: '선택 해제', action: () => setSelectedMenus([]) }
+                      ].map((macro) => (
                         <button
-                          key={opt.value}
+                          key={macro.label}
                           type="button"
-                          onClick={() => setMaxSwipeCount(opt.value)}
-                          className={`py-2 text-[11px] font-medium rounded-md transition-all ${
-                            maxSwipeCount === opt.value
-                              ? 'bg-orange-500 text-white shadow-sm font-bold'
-                              : 'text-zinc-500 hover:text-zinc-700'
-                          }`}
+                          onClick={macro.action}
+                          className="py-1.5 text-[10px] font-medium rounded-md bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50 active:scale-95 transition-all shadow-xs"
                         >
-                          {opt.label}
+                          {macro.label}
                         </button>
                       ))}
+                    </div>
+
+                    {/* Checklist Grid */}
+                    <div className="grid grid-cols-3 gap-2 max-h-56 overflow-y-auto p-2 bg-white rounded-lg border border-zinc-200">
+                      {Object.entries(MENU_METADATA).map(([menuName, meta]) => {
+                        const isChecked = selectedMenus.includes(menuName);
+                        return (
+                          <button
+                            key={menuName}
+                            type="button"
+                            onClick={() => {
+                              if (isChecked) {
+                                setSelectedMenus(selectedMenus.filter(m => m !== menuName));
+                              } else {
+                                setSelectedMenus([...selectedMenus, menuName]);
+                              }
+                            }}
+                            className={`flex flex-col items-center justify-center p-2 rounded-xl border text-center transition-all ${
+                              isChecked
+                                ? 'border-orange-500 bg-orange-50/40 text-orange-950 font-semibold shadow-xs ring-1 ring-orange-500/20'
+                                : 'border-zinc-100 bg-zinc-50/50 hover:bg-zinc-50 text-zinc-600 hover:border-zinc-200'
+                            }`}
+                          >
+                            <span className="text-xl mb-1">{meta.emoji}</span>
+                            <span className="text-[10px] truncate w-full">{menuName}</span>
+                            <span className={`text-[7px] mt-0.5 px-1 py-0.5 rounded-sm border ${
+                              isChecked
+                                ? 'bg-orange-100/50 text-orange-700 border-orange-200/50'
+                                : 'bg-zinc-100/70 text-zinc-400 border-zinc-200/20'
+                            }`}>
+                              {meta.category.split('/')[0].trim()}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
