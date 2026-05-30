@@ -992,7 +992,7 @@ function App() {
                 <span className="text-orange-500">스와이프 한 번이면 끝</span>
               </h1>
               <p className="text-zinc-500 text-sm sm:text-base max-w-md leading-relaxed mx-auto md:mx-0">
-                더 이상 "아무거나"는 없습니다. 친구들과 실시간으로 메뉴 카드를 밀어서 투표하면, 모두가 만족할 메뉴를 찾아드려요.
+                더 이상 "아무거나"는 없습니다. 스와이프로 만족할 메뉴를 고르고, 쫄깃한 소금 아메리카노 복불복 게임으로 오늘 커피 쏠 주인공을 즉시 정해드려요! ☕🎰
               </p>
 
               {/* Feature Pills */}
@@ -1008,6 +1008,10 @@ function App() {
                 <div className="flex items-center gap-2 bg-white border border-zinc-200 px-4 py-2.5 rounded-lg text-sm text-zinc-700">
                   <Compass className="w-4 h-4 text-orange-500" />
                   맛집 매칭 지도
+                </div>
+                <div className="flex items-center gap-2 bg-white border border-orange-200 shadow-xs hover:border-rose-300 px-4 py-2.5 rounded-lg text-sm text-rose-600 font-black animate-pulse">
+                  <Sparkles className="w-4 h-4 text-rose-500 animate-spin-slow" />
+                  ☕ 커피빵 미니게임
                 </div>
               </div>
             </div>
