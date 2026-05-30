@@ -46,7 +46,7 @@ public class WelstoryMenuService {
     public WelstoryMenuResult getTodayMenu(String cotNo, String hallNo, String cafeteriaName) {
         LocalDate today = LocalDate.now();
         String dateStr = today.toString();
-        String targetUrl = String.format("https://welstoryplus.com/api/meal/mealList.do?cotNo=%s&hallNo=%s&menuDt=%s", 
+        String targetUrl = String.format("https://welplus.welstory.com/api/meal/mealList.do?cotNo=%s&hallNo=%s&menuDt=%s", 
             cotNo, hallNo, today.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")));
         
         log.info("Attempting to fetch real-time Welstory menu from URL: {}", targetUrl);
