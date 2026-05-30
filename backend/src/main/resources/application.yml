@@ -5,6 +5,10 @@ spring:
   profiles:
     active: local
 
+kakao:
+  api:
+    rest-key: ${KAKAO_REST_API_KEY:4d6379aaf33b3d3c003c6772ed718e7c}
+
 ---
 # 💻 로컬 개발 환경 (H2 In-Memory DB)
 spring:

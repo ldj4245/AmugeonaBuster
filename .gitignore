@@ -35,8 +35,10 @@ package-lock.json
 .settings/
 bin/
 
-# ==========================================
-# 🍏 System Files
-# ==========================================
+# System Files
 .DS_Store
 Thumbs.db
+
+# Generated Frontend static assets in backend
+/backend/src/main/resources/static/
+

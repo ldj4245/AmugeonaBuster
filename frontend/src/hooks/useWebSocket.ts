@@ -31,8 +31,9 @@ export function useWebSocket(
   useEffect(() => {
     if (!roomId) return;
 
-    // SockJS 팩토리 바인딩 및 STOMP Client 설정
-    const socketUrl = 'http://localhost:8080/ws-connection';
+    const socketUrl = window.location.hostname === 'localhost'
+      ? 'http://localhost:8080/ws-connection'
+      : `${window.location.origin}/ws-connection`;
     const client = new Client({
       webSocketFactory: () => new SockJS(socketUrl),
       reconnectDelay: 5000,

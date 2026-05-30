@@ -52,3 +52,24 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+task buildFrontend(type: Exec) {
+    workingDir '../frontend'
+    inputs.dir '../frontend/src'
+    outputs.dir '../frontend/dist'
+
+    if (System.getProperty('os.name').toLowerCase().contains('windows')) {
+        commandLine 'cmd', '/c', 'npm install && npm run build'
+    } else {
+        commandLine 'sh', '-c', 'npm install && npm run build'
+    }
+}
+
+task copyFrontendToStatic(type: Copy) {
+    dependsOn buildFrontend
+    from '../frontend/dist'
+    into 'src/main/resources/static'
+}
+
+processResources.dependsOn copyFrontendToStatic
+
