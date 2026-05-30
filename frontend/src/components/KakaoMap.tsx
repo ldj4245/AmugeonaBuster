@@ -282,17 +282,19 @@ export function KakaoMap({ matchedRestaurants, location }: KakaoMapProps) {
         )}
       </div>
 
-      {isLoading && (
-        <div className="w-full h-[220px] bg-slate-50 border border-slate-200/60 rounded-2xl flex flex-col items-center justify-center gap-2">
-          <div className="w-8 h-8 border-4 border-rose-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-[11px] text-slate-400 font-semibold">지도를 불러오는 중...</span>
-        </div>
-      )}
+      <div className="relative w-full h-[220px]">
+        {isLoading && (
+          <div className="absolute inset-0 bg-slate-50 border border-slate-200/60 rounded-2xl flex flex-col items-center justify-center gap-2 z-10">
+            <div className="w-8 h-8 border-4 border-rose-500 border-t-transparent rounded-full animate-spin" />
+            <span className="text-[11px] text-slate-400 font-semibold">지도를 불러오는 중...</span>
+          </div>
+        )}
 
-      <div 
-        ref={mapContainerRef} 
-        className={`w-full h-[220px] rounded-2xl border border-slate-200/60 shadow-inner overflow-hidden ${isLoading ? 'hidden' : 'block'}`}
-      />
+        <div 
+          ref={mapContainerRef} 
+          className="w-full h-full rounded-2xl border border-slate-200/60 shadow-inner overflow-hidden"
+        />
+      </div>
     </div>
   );
 }
