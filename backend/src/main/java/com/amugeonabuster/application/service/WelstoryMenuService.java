@@ -65,7 +65,8 @@ public class WelstoryMenuService {
             String searchUrl = "https://welplan.pmh.codes/proxy/search?q=" + java.net.URLEncoder.encode(searchName, "UTF-8");
             log.info("Querying Welplan search: {}", searchUrl);
             
-            String searchRes = restTemplate.getForObject(searchUrl, String.class);
+            byte[] searchBytes = restTemplate.getForObject(searchUrl, byte[].class);
+            String searchRes = searchBytes != null ? new String(searchBytes, java.nio.charset.StandardCharsets.UTF_8) : null;
             String restaurantId = null;
             
             if (searchRes != null && searchRes.startsWith("[")) {
@@ -93,8 +94,9 @@ public class WelstoryMenuService {
             headers.set("Cookie", "welplan_restaurants=" + encodedCookie);
             
             org.springframework.http.HttpEntity<String> entity = new org.springframework.http.HttpEntity<>(headers);
-            org.springframework.http.ResponseEntity<String> response = restTemplate.exchange(targetUrl, org.springframework.http.HttpMethod.GET, entity, String.class);
-            String html = response.getBody();
+            org.springframework.http.ResponseEntity<byte[]> response = restTemplate.exchange(targetUrl, org.springframework.http.HttpMethod.GET, entity, byte[].class);
+            byte[] bodyBytes = response.getBody();
+            String html = bodyBytes != null ? new String(bodyBytes, java.nio.charset.StandardCharsets.UTF_8) : "";
             
             if (html != null && !html.isEmpty()) {
                 // 3. menus 배열 추출
