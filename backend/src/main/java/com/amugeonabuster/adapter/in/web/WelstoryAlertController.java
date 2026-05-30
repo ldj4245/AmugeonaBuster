@@ -205,6 +205,32 @@ public class WelstoryAlertController {
     }
 
     /**
+     * 오늘의 구내식당 식단 발송 완료 플래그를 강제로 초기화합니다 (테스트 지원용).
+     */
+    @PostMapping("/reset-last-sent")
+    public ResponseEntity<Map<String, Object>> resetLastSent(@RequestParam(value = "kakaoId", required = false) String kakaoId) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            if (kakaoId == null || kakaoId.trim().isEmpty()) {
+                log.info("Resetting lastSentDate for all users.");
+                welstoryAlertUseCase.resetAllLastSentDates();
+                response.put("message", "전체 사용자의 오늘 자 발송 완료 플래그가 강제 초기화되었습니다! 🔄");
+            } else {
+                log.info("Resetting lastSentDate for kakaoId: {}", kakaoId);
+                welstoryAlertUseCase.resetLastSentDate(kakaoId);
+                response.put("message", "해당 사용자의 오늘 자 발송 완료 플래그가 강제 초기화되었습니다! 🔄");
+            }
+            response.put("success", true);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Failed to reset lastSentDate: {}", e.getMessage(), e);
+            response.put("success", false);
+            response.put("message", "초기화 실패: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
      * 특정 구내식당 지점의 오늘의 실시간 전체 식단 목록을 조회합니다.
      * 프론트엔드 프리미엄 상세 메뉴판 뷰어에서 실시간 호출합니다.
      */

@@ -34,6 +34,14 @@ public class WelstoryPersistenceAdapter implements WelstoryAlertPort {
         return toDomain(saved);
     }
 
+    @Override
+    public void resetAllLastSentDates() {
+        repository.findAll().forEach(entity -> {
+            entity.setLastSentDate(null);
+            repository.save(entity);
+        });
+    }
+
     private WelstoryAlertSettings toDomain(WelstoryAlertSettingsJpaEntity entity) {
         if (entity == null) return null;
         return WelstoryAlertSettings.builder()

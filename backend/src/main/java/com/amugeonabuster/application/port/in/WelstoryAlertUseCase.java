@@ -8,4 +8,6 @@ public interface WelstoryAlertUseCase {
     Optional<WelstoryAlertSettings> getSettings(String kakaoId);
     WelstoryAlertSettings saveSettings(WelstoryAlertSettings settings);
     boolean triggerTestSend(String kakaoId) throws Exception;
+    void resetLastSentDate(String kakaoId);
+    void resetAllLastSentDates();
 }

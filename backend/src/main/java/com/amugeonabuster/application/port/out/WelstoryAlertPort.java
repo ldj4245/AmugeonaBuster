@@ -9,4 +9,5 @@ public interface WelstoryAlertPort {
     Optional<WelstoryAlertSettings> findByKakaoId(String kakaoId);
     List<WelstoryAlertSettings> findAllByScheduledTimeAndIsEnabled(String scheduledTime);
     WelstoryAlertSettings save(WelstoryAlertSettings setting);
+    void resetAllLastSentDates();
 }

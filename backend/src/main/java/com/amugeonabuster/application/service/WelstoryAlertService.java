@@ -58,4 +58,19 @@ public class WelstoryAlertService implements WelstoryAlertUseCase {
         }
         return success;
     }
+
+    @Override
+    public void resetLastSentDate(String kakaoId) {
+        welstoryAlertPort.findByKakaoId(kakaoId).ifPresent(setting -> {
+            setting.setLastSentDate(null);
+            welstoryAlertPort.save(setting);
+            log.info("Successfully reset lastSentDate to null for user: {}", setting.getNickname());
+        });
+    }
+
+    @Override
+    public void resetAllLastSentDates() {
+        welstoryAlertPort.resetAllLastSentDates();
+        log.info("Successfully reset lastSentDate to null for all active users.");
+    }
 }
