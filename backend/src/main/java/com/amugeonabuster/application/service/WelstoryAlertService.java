@@ -41,7 +41,7 @@ public class WelstoryAlertService implements WelstoryAlertUseCase {
         );
 
         // 2. 카톡 나에게 보내기 발송
-        boolean success = kakaoMessageService.sendWelstoryMenuToMe(setting.getKakaoAccessToken(), menu);
+        boolean success = kakaoMessageService.sendWelstoryMenuToMe(setting.getKakaoAccessToken(), menu, setting.getCotNo(), setting.getHallNo());
         
         if (!success) {
             // 토큰 갱신 시도
@@ -54,7 +54,7 @@ public class WelstoryAlertService implements WelstoryAlertUseCase {
             welstoryAlertPort.save(setting);
 
             // 재발송 시도
-            success = kakaoMessageService.sendWelstoryMenuToMe(setting.getKakaoAccessToken(), menu);
+            success = kakaoMessageService.sendWelstoryMenuToMe(setting.getKakaoAccessToken(), menu, setting.getCotNo(), setting.getHallNo());
         }
         return success;
     }

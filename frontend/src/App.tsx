@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Flame, Compass, Users, Sparkles, MapPin, ArrowRight, CheckCircle2, RefreshCw, Phone, Info, AlertCircle, Copy, X } from 'lucide-react';
+import { Flame, Compass, Users, Sparkles, MapPin, ArrowRight, CheckCircle2, RefreshCw, Phone, Info, AlertCircle, Copy, X, Settings } from 'lucide-react';
 import TinderCard from 'react-tinder-card';
 import { useWebSocket, WebSocketRoomResponse } from './hooks/useWebSocket';
 import { KakaoMap } from './components/KakaoMap';
@@ -37,6 +37,61 @@ const isLocalDev = window.location.hostname === 'localhost' || window.location.h
 const BASE_URL = isLocalDev
   ? `http://localhost:8080/api/rooms`
   : `${window.location.origin}/api/rooms`;
+
+// 구내식당 코스별 스타일 매핑 헬퍼
+const getCourseStyle = (courseName: string) => {
+  const name = (courseName || '').toUpperCase();
+  if (name.includes('A코스') || name.includes('한식') || name.includes('KOREAN') || name.includes('소담') || name.includes('찌개') || name.includes('탕')) {
+    return {
+      badgeGradient: 'from-orange-500 to-amber-500',
+      courseEmoji: '🍚'
+    };
+  } else if (name.includes('B코스') || name.includes('일식') || name.includes('JAPANESE') || name.includes('돈카츠') || name.includes('카츠') || name.includes('초밥')) {
+    return {
+      badgeGradient: 'from-rose-500 to-orange-500',
+      courseEmoji: '🍣'
+    };
+  } else if (name.includes('C코스') || name.includes('양식') || name.includes('WESTERN') || name.includes('파스타') || name.includes('스테이크') || name.includes('피자')) {
+    return {
+      badgeGradient: 'from-amber-500 to-yellow-500',
+      courseEmoji: '🍝'
+    };
+  } else if (name.includes('아시안') || name.includes('중식') || name.includes('CHINESE') || name.includes('라멘') || name.includes('짜장') || name.includes('짬뽕') || name.includes('마라')) {
+    return {
+      badgeGradient: 'from-teal-500 to-emerald-500',
+      courseEmoji: '🍜'
+    };
+  } else if (name.includes('테이크아웃') || name.includes('TAKEOUT') || name.includes('도시락') || name.includes('샌드위치') || name.includes('베이글') || name.includes('샐러드') || name.includes('빵')) {
+    return {
+      badgeGradient: 'from-emerald-500 to-teal-600',
+      courseEmoji: '🥪'
+    };
+  }
+  return {
+    badgeGradient: 'from-orange-500 to-amber-500',
+    courseEmoji: '🍴'
+  };
+};
+
+// 구내식당 메뉴 카테고리별 프리미엄 Unsplash 이미지 매핑 헬퍼 (하드코딩 방지 및 비주얼 완성)
+const getCourseImage = (courseName: string, apiImageUrl?: string) => {
+  if (apiImageUrl && apiImageUrl.startsWith('http')) {
+    return apiImageUrl;
+  }
+  const name = (courseName || '').toUpperCase();
+  if (name.includes('한식') || name.includes('소담') || name.includes('찌개') || name.includes('탕') || name.includes('국밥')) {
+    return 'https://images.unsplash.com/photo-1569562211093-4ed0d0758f12?auto=format&fit=crop&w=600&q=80';
+  } else if (name.includes('일식') || name.includes('돈카츠') || name.includes('카츠') || name.includes('초밥') || name.includes('라멘')) {
+    return 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=600&q=80';
+  } else if (name.includes('양식') || name.includes('파스타') || name.includes('스테이크') || name.includes('피자') || name.includes('샐러드')) {
+    return 'https://images.unsplash.com/photo-1546549032-9571cd6b27df?auto=format&fit=crop&w=600&q=80';
+  } else if (name.includes('중식') || name.includes('짜장') || name.includes('짬뽕') || name.includes('마라')) {
+    return 'https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=600&q=80';
+  } else if (name.includes('테이크아웃') || name.includes('도시락') || name.includes('샌드위치') || name.includes('베이글') || name.includes('빵')) {
+    return 'https://images.unsplash.com/photo-1509722747041-616f39b57569?auto=format&fit=crop&w=600&q=80';
+  }
+  return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80';
+};
 
 function App() {
   // 상태 변수 정의
@@ -79,6 +134,40 @@ function App() {
   
   const isEscapingRef = useRef(false);
 
+  // 🍱 웰스토리 오늘 전체 메뉴판 뷰어 관련 상태 변수
+  const [isMenuDetailOpen, setIsMenuDetailOpen] = useState(false);
+  const [menuDetailCafeteriaName, setMenuDetailCafeteriaName] = useState('');
+  const [menuDetailDate, setMenuDetailDate] = useState('');
+  const [menuDetailCourses, setMenuDetailCourses] = useState<any[]>([]);
+  const [menuDetailLoading, setMenuDetailLoading] = useState(false);
+  const [menuDetailError, setMenuDetailError] = useState<string | null>(null);
+  const [menuDetailCotNo, setMenuDetailCotNo] = useState('');
+  const [menuDetailHallNo, setMenuDetailHallNo] = useState('');
+
+  // 실시간 식단 상세 조회 API 핸들러
+  const triggerFetchMenuDetails = async (cotNo: string, hallNo: string, name: string) => {
+    setMenuDetailLoading(true);
+    setMenuDetailError(null);
+    setIsMenuDetailOpen(true);
+    setMenuDetailCafeteriaName(name);
+    setMenuDetailCotNo(cotNo);
+    setMenuDetailHallNo(hallNo);
+    try {
+      const response = await fetch(`${window.location.origin}/api/welstory/menu-details?cotNo=${cotNo}&hallNo=${hallNo}&cafeteriaName=${encodeURIComponent(name)}`);
+      if (!response.ok) {
+        throw new Error('오늘의 식단 리스트를 실시간으로 가져오는 데 실패했습니다.');
+      }
+      const data = await response.json();
+      setMenuDetailCafeteriaName(data.cafeteriaName || name);
+      setMenuDetailDate(data.dateStr || '오늘');
+      setMenuDetailCourses(data.courses || []);
+    } catch (err: any) {
+      setMenuDetailError(err.message || '식단 정보 수집 도중 예상치 못한 오류가 발생했습니다.');
+    } finally {
+      setMenuDetailLoading(false);
+    }
+  };
+
   // URL 파라미터 감지 및 자동 기동 효과
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -87,6 +176,21 @@ function App() {
     const escapeLocation = urlParams.get('location');
     const welstoryParam = urlParams.get('welstory');
     const code = urlParams.get('code');
+    const viewMenuParam = urlParams.get('view-menu');
+    const viewCotNo = urlParams.get('cotNo');
+    const viewHallNo = urlParams.get('hallNo');
+    const viewName = urlParams.get('name');
+
+    // 0. 웰스토리 오늘 전체 메뉴판 뷰어 자동 기동 (?view-menu=true&cotNo=...&hallNo=...)
+    if (viewMenuParam === 'true' && viewCotNo && viewHallNo) {
+      const decodedName = viewName ? decodeURIComponent(viewName) : '삼성웰스토리';
+      triggerFetchMenuDetails(viewCotNo, viewHallNo, decodedName);
+      
+      // URL 파라미터 정리
+      const cleanUrl = window.location.origin + window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+      return;
+    }
 
     // 1. 구식 탈출 자동 매칭 (?escape=true&location=...)
     if (escape === 'true' && escapeLocation && !isEscapingRef.current) {
@@ -1681,6 +1785,239 @@ function App() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🍱 웰스토리 실시간 전체 식단표 프리미엄 뷰어 모달 */}
+      {isMenuDetailOpen && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-50 border border-zinc-200 rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] scale-100 transition-all duration-300">
+            
+            {/* 1. 프리미엄 배너 헤더 */}
+            <div className="bg-gradient-to-br from-orange-500 via-amber-500 to-red-500 text-white p-6 sm:p-8 relative flex flex-col gap-2 shrink-0 shadow-lg">
+              <div className="absolute top-4 sm:top-6 right-4 sm:right-6 flex items-center gap-2">
+                {/* 알림 설정창 워프 링크 */}
+                <button 
+                  onClick={() => {
+                    setIsMenuDetailOpen(false);
+                    setIsWelstoryModalOpen(true);
+                  }}
+                  title="알림 주기 및 지점 변경 설정"
+                  className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center shadow-xs"
+                >
+                  <Settings className="w-4 h-4 sm:w-5 h-5 animate-hover-spin" />
+                </button>
+                {/* 창 닫기 */}
+                <button 
+                  onClick={() => setIsMenuDetailOpen(false)}
+                  title="메뉴판 닫기"
+                  className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center shadow-xs"
+                >
+                  <X className="w-4 h-4 sm:w-5 h-5" />
+                </button>
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-orange-950 bg-yellow-100 self-start px-3 py-1 rounded-full shadow-inner">
+                🍱 실시간 구내식당 메뉴판
+              </span>
+              <h3 className="text-xl sm:text-2xl font-black tracking-tight mt-1 flex items-center gap-2">
+                {menuDetailCafeteriaName}
+              </h3>
+              <p className="text-xs sm:text-sm text-white/90 font-medium flex items-center gap-1.5 mt-0.5">
+                <span className="font-semibold text-yellow-200">📅 {menuDetailDate}</span>
+              </p>
+            </div>
+
+            {/* 2. 로딩 상태 */}
+            {menuDetailLoading && (
+              <div className="flex flex-col items-center justify-center py-24 px-6 gap-5 text-center flex-grow">
+                <RefreshCw className="w-10 h-10 animate-spin text-orange-500" />
+                <div className="flex flex-col gap-1.5">
+                  <h4 className="font-bold text-zinc-800 text-base">실시간 식단 데이터 수집 중</h4>
+                  <p className="text-xs text-zinc-500 max-w-sm leading-relaxed">
+                    삼성 웰스토리 플러스의 실시간 코너 정보를 가공하여 최상의 가독성으로 변환 중입니다. 잠시만 기다려 주세요!
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* 3. 에러 발생 상태 */}
+            {menuDetailError && (
+              <div className="flex flex-col items-center justify-center py-20 px-6 gap-6 text-center max-w-md mx-auto flex-grow">
+                <div className="w-16 h-16 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-500 shadow-sm border border-rose-100">
+                  <AlertCircle className="w-8 h-8" />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <h4 className="font-bold text-zinc-800 text-base">식단 정보를 가져올 수 없습니다</h4>
+                  <p className="text-xs text-rose-600 leading-relaxed font-semibold">{menuDetailError}</p>
+                </div>
+                <div className="flex gap-3 w-full">
+                  <button
+                    onClick={() => triggerFetchMenuDetails(menuDetailCotNo, menuDetailHallNo, menuDetailCafeteriaName)}
+                    className="flex-1 py-3.5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl transition-all text-xs cursor-pointer shadow-md"
+                  >
+                    새로고침 🔄
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsMenuDetailOpen(false);
+                      setIsWelstoryModalOpen(true);
+                    }}
+                    className="flex-1 py-3.5 bg-zinc-800 hover:bg-zinc-900 text-white font-bold rounded-xl transition-all text-xs cursor-pointer shadow-sm"
+                  >
+                    지점 변경 ⚙️
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 4. 데이터가 존재하지 않는 경우 */}
+            {!menuDetailLoading && !menuDetailError && menuDetailCourses.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-24 px-6 gap-5 text-center flex-grow">
+                <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 border border-amber-100">
+                  <Info className="w-8 h-8" />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <h4 className="font-bold text-zinc-800 text-base">오늘 등록된 식단이 없습니다</h4>
+                  <p className="text-xs text-zinc-500 max-w-xs leading-relaxed">
+                    주말/공휴일이거나 해당 식당 지점의 식단 등록이 완료되지 않았습니다. 설정에서 지점을 변경해 보세요!
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsMenuDetailOpen(false);
+                    setIsWelstoryModalOpen(true);
+                  }}
+                  className="mt-2 py-2.5 px-5 bg-zinc-800 hover:bg-zinc-900 text-white font-bold rounded-xl transition-colors text-xs cursor-pointer shadow-sm"
+                >
+                  구내식당 지점 변경하러 가기 ⚙️
+                </button>
+              </div>
+            )}
+
+            {/* 5. 정상 식단 목록 (스크롤) */}
+            {!menuDetailLoading && !menuDetailError && menuDetailCourses.length > 0 && (
+              <div className="overflow-y-auto p-5 sm:p-8 flex-grow bg-slate-50/50">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {menuDetailCourses.map((course: any, idx: number) => {
+                    const { badgeGradient, courseEmoji } = getCourseStyle(course.courseName);
+                    
+                    // Comma로 나열된 반찬 메뉴 상세 파싱
+                    const dishes = course.menuDetails
+                      ? course.menuDetails.split(',').map((d: string) => d.trim()).filter((d: string) => d.length > 0)
+                      : [];
+                    
+                    const mainDish = dishes[0] || '식단 준비 중';
+                    const sideDishes = dishes.slice(1);
+                    
+                    // 칼로리 게이지 바 비율 및 스타일 계산
+                    const caloriePercentage = Math.min(100, Math.max(10, (course.calories / 1200) * 100));
+                    const calorieColorClass = course.calories < 600 
+                      ? 'bg-emerald-500' 
+                      : course.calories < 850 
+                        ? 'bg-orange-500' 
+                        : 'bg-rose-500';
+
+                    return (
+                      <div 
+                        key={idx} 
+                        className="relative bg-white border border-zinc-200 hover:border-orange-300 rounded-3xl p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between gap-5 overflow-hidden group"
+                      >
+                        {/* 최상단 코너 그라데이션 장식 선 */}
+                        <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${badgeGradient}`} />
+
+                        <div className="flex flex-col gap-4">
+                          {/* 코너 타이틀 배지 및 가격 정보 */}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`text-xs font-black tracking-tight text-white bg-gradient-to-r ${badgeGradient} px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm`}>
+                              <span>{courseEmoji}</span>
+                              {course.courseName}
+                            </span>
+                            {course.price && (
+                              <span className="text-xs font-bold text-zinc-600 bg-zinc-100/80 border border-zinc-200/40 px-3 py-1.5 rounded-xl font-mono shadow-xs">
+                                💰 {course.price}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* 프리미엄 썸네일 비주얼 (Unsplash Fallback 및 실시간 이미지 융합) */}
+                          <div className="relative w-full h-44 rounded-2xl overflow-hidden bg-zinc-100 shadow-inner border border-zinc-100">
+                            <img 
+                              src={getCourseImage(course.courseName, course.imageUrl)} 
+                              alt={course.courseName} 
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                              onError={(e) => {
+                                // 이미지 로딩 실패 시 Unsplash 테마 이미지로 강제 복구해 완성도를 높임
+                                e.currentTarget.src = getCourseImage(course.courseName);
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent pointer-events-none" />
+                          </div>
+
+                          {/* 직관적인 한눈에 보는 메뉴판 리스트 */}
+                          <div className="flex flex-col gap-3.5">
+                            {/* 메인 메뉴 하이라이팅 */}
+                            <div className="bg-orange-50/50 border border-orange-100/50 p-3.5 rounded-2xl">
+                              <span className="text-[9px] font-black text-orange-500 bg-orange-100/60 px-2 py-0.5 rounded-md uppercase tracking-wider block w-fit mb-1.5">
+                                👑 오늘의 메인 요리
+                              </span>
+                              <h4 className="text-sm font-black text-zinc-800 leading-snug">
+                                {mainDish}
+                              </h4>
+                            </div>
+
+                            {/* 사이드/반찬 리스트 그리드 */}
+                            {sideDishes.length > 0 && (
+                              <div className="flex flex-col gap-2 px-1">
+                                <span className="text-[10px] font-extrabold text-zinc-400 uppercase tracking-wider block mb-1">
+                                  🥗 함께 제공되는 찬류 및 사이드
+                                </span>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                                  {sideDishes.map((side: string, sIdx: number) => (
+                                    <div key={sIdx} className="flex items-center gap-2 text-xs font-bold text-zinc-600">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0 shadow-xs" />
+                                      <span className="truncate" title={side}>{side}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 칼로리 게이지 바 */}
+                        {course.calories > 0 && (
+                          <div className="border-t border-zinc-100 pt-4 flex flex-col gap-1.5">
+                            <div className="flex items-center justify-between text-[11px] font-black text-zinc-400">
+                              <span className="flex items-center gap-1">🔥 총 칼로리</span>
+                              <span className="font-mono text-zinc-700 text-xs font-bold">{course.calories} kcal</span>
+                            </div>
+                            <div className="w-full h-2.5 bg-zinc-100 rounded-full overflow-hidden shadow-inner relative">
+                              <div 
+                                className={`h-full rounded-full transition-all duration-500 ${calorieColorClass}`} 
+                                style={{ width: `${caloriePercentage}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 6. 모달 하단 퀵 액션 */}
+            <div className="bg-zinc-50/80 border-t border-zinc-200 p-4 shrink-0 flex items-center justify-between gap-4 text-xs font-bold text-zinc-500 sm:px-6">
+              <span>💡 메뉴 클릭 및 가독성에 불만족하시면 우측 상단 기어 아이콘을 통해 알림 설정을 변경하세요.</span>
+              <button 
+                onClick={() => setIsMenuDetailOpen(false)}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-900 text-white rounded-lg transition-colors cursor-pointer shrink-0"
+              >
+                닫기
+              </button>
+            </div>
+
           </div>
         </div>
       )}

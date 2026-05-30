@@ -82,7 +82,7 @@ public class WelstoryScheduler {
         );
 
         // 2. 카카오톡 메시지 전송 시도
-        boolean success = kakaoMessageService.sendWelstoryMenuToMe(setting.getKakaoAccessToken(), menu);
+        boolean success = kakaoMessageService.sendWelstoryMenuToMe(setting.getKakaoAccessToken(), menu, setting.getCotNo(), setting.getHallNo());
         
         if (!success) {
             // 💡 발송 실패 시 토큰 만료(401)일 확률이 높으므로 즉시 Refresh Token으로 자동 갱신 시도!
@@ -98,7 +98,7 @@ public class WelstoryScheduler {
                 
                 // 갱신된 신규 엑세스 토큰으로 재시도 발송!
                 log.info("Token refresh successful. Retrying message send for user {}", setting.getNickname());
-                success = kakaoMessageService.sendWelstoryMenuToMe(setting.getKakaoAccessToken(), menu);
+                success = kakaoMessageService.sendWelstoryMenuToMe(setting.getKakaoAccessToken(), menu, setting.getCotNo(), setting.getHallNo());
                 
                 if (success) {
                     log.info("Retried message send successful!");

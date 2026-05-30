@@ -146,21 +146,26 @@ public class KakaoMessageService {
 
     /**
      * 웰스토리 식단 결과를 '카카오톡 나에게 보내기' API로 발송합니다.
-     * 모바일 화면에서의 글자 수 잘림을 완벽히 방지하기 위해 '리스트(List)형 템플릿'을 적용합니다.
+     * 모바일 화면에서의 글자 수 잘림을 완벽히 방지하기 위해 '리스트(List)형 템플릿'을 적용하며,
+     * 클릭 시 웹앱의 '전체 메뉴판 상세 페이지'로 연계되는 파라미터 링킹을 구축합니다.
      */
-    public boolean sendWelstoryMenuToMe(String accessToken, WelstoryMenuService.WelstoryMenuResult menu) {
-        log.info("Sending Welstory menu to user KakaoTalk using LIST template. Cafeteria: {}", menu.getCafeteriaName());
+    public boolean sendWelstoryMenuToMe(String accessToken, WelstoryMenuService.WelstoryMenuResult menu, String cotNo, String hallNo) {
+        log.info("Sending Welstory menu to user KakaoTalk using LIST template. Cafeteria: {}, cotNo: {}, hallNo: {}", menu.getCafeteriaName(), cotNo, hallNo);
         
         try {
+            String encodedLoc = URLEncoder.encode(menu.getCafeteriaName(), StandardCharsets.UTF_8);
+            String viewMenuUrl = "https://amugeona-buster-6eda848df67d.herokuapp.com/?view-menu=true&cotNo=" 
+                + cotNo + "&hallNo=" + hallNo + "&name=" + encodedLoc;
+
             Map<String, Object> template = new HashMap<>();
             template.put("object_type", "list");
             
-            // 1. 헤더 타이틀 설정
+            // 1. 헤더 타이틀 설정 및 전체 메뉴판 링크 바인딩
             template.put("header_title", "🍱 " + menu.getCafeteriaName());
             
             Map<String, String> headerLink = new HashMap<>();
-            headerLink.put("web_url", "https://amugeona-buster-6eda848df67d.herokuapp.com");
-            headerLink.put("mobile_web_url", "https://amugeona-buster-6eda848df67d.herokuapp.com");
+            headerLink.put("web_url", viewMenuUrl);
+            headerLink.put("mobile_web_url", viewMenuUrl);
             template.put("header_link", headerLink);
 
             // 2. 리스트에 들어갈 아이템 콘텐츠 구성 (카카오 규격상 최대 3개 행 노출 지원)
@@ -205,14 +210,13 @@ public class KakaoMessageService {
             }
             template.put("contents", contents);
 
-            // 3. 버튼 오브젝트들 빌드 (1순위 탈출 추천, 2순위 변경 모달)
+            // 3. 버튼 오브젝트들 빌드 (1순위 탈출 추천, 2순위 상세 보기)
             List<Map<String, Object>> buttons = new ArrayList<>();
             
             Map<String, Object> btnEscape = new HashMap<>();
             btnEscape.put("title", "🔥 구식 싫어요! 외부 맛집 추천");
             
             Map<String, String> escapeLink = new HashMap<>();
-            String encodedLoc = URLEncoder.encode(menu.getCafeteriaName(), StandardCharsets.UTF_8);
             String escapeUrl = "https://amugeona-buster-6eda848df67d.herokuapp.com/?escape=true&location=" + encodedLoc;
             escapeLink.put("web_url", escapeUrl);
             escapeLink.put("mobile_web_url", escapeUrl);
@@ -221,12 +225,11 @@ public class KakaoMessageService {
             buttons.add(btnEscape);
 
             Map<String, Object> btnSettings = new HashMap<>();
-            btnSettings.put("title", "⚙️ 알림 시간/지점 변경");
+            btnSettings.put("title", "💬 오늘 메뉴 자세히 보기 (전체 코스)");
             
             Map<String, String> settingsLink = new HashMap<>();
-            String settingsUrl = "https://amugeona-buster-6eda848df67d.herokuapp.com/?welstory=true";
-            settingsLink.put("web_url", settingsUrl);
-            settingsLink.put("mobile_web_url", settingsUrl);
+            settingsLink.put("web_url", viewMenuUrl);
+            settingsLink.put("mobile_web_url", viewMenuUrl);
             
             btnSettings.put("link", settingsLink);
             buttons.add(btnSettings);

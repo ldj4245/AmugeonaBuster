@@ -203,4 +203,24 @@ public class WelstoryAlertController {
         presets.add(CafeteriaPreset.builder().name("삼성웰스토리 본사 식당").cotNo("WEL_HQ").hallNo("HALL_06").build());
         return ResponseEntity.ok(presets);
     }
+
+    /**
+     * 특정 구내식당 지점의 오늘의 실시간 전체 식단 목록을 조회합니다.
+     * 프론트엔드 프리미엄 상세 메뉴판 뷰어에서 실시간 호출합니다.
+     */
+    @GetMapping("/menu-details")
+    public ResponseEntity<WelstoryMenuService.WelstoryMenuResult> getMenuDetails(
+            @RequestParam("cotNo") String cotNo,
+            @RequestParam("hallNo") String hallNo,
+            @RequestParam("cafeteriaName") String cafeteriaName
+    ) {
+        log.info("Fetching real-time Welstory menu details for cotNo: {}, hallNo: {}", cotNo, hallNo);
+        try {
+            WelstoryMenuService.WelstoryMenuResult menuResult = menuService.getTodayMenu(cotNo, hallNo, cafeteriaName);
+            return ResponseEntity.ok(menuResult);
+        } catch (Exception e) {
+            log.error("Failed to fetch Welstory menu details: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 }
