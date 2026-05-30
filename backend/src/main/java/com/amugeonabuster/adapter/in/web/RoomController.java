@@ -3,6 +3,7 @@ package com.amugeonabuster.adapter.in.web;
 import com.amugeonabuster.adapter.in.web.dto.*;
 import com.amugeonabuster.application.port.in.CreateRoomUseCase;
 import com.amugeonabuster.application.port.in.CreateRoomUseCase.CreateRoomCommand;
+import com.amugeonabuster.application.port.in.GetRoomUseCase;
 import com.amugeonabuster.application.port.in.JoinRoomUseCase;
 import com.amugeonabuster.application.port.in.JoinRoomUseCase.JoinRoomCommand;
 import com.amugeonabuster.application.port.in.StartVotingUseCase;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 public class RoomController {
 
     private final CreateRoomUseCase createRoomUseCase;
+    private final GetRoomUseCase getRoomUseCase;
     private final JoinRoomUseCase joinRoomUseCase;
     private final StartVotingUseCase startVotingUseCase;
     private final SwipeMenuUseCase swipeMenuUseCase;
@@ -95,5 +97,15 @@ public class RoomController {
         RoomResponse response = RoomResponse.fromDomain(room);
 
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 특정 방의 현재 상태 조회 API (GET /api/rooms/{roomId})
+     */
+    @GetMapping("/{roomId}")
+    public ResponseEntity<RoomResponse> getRoom(@PathVariable("roomId") String roomId) {
+        return getRoomUseCase.getRoom(roomId)
+                .map(room -> ResponseEntity.ok(RoomResponse.fromDomain(room)))
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
 }
