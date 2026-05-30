@@ -34,8 +34,8 @@ public class KakaoLocalSearchAdapter implements RecommendRestaurantsPort {
 
         try {
             if (restKey == null || restKey.isBlank() || restKey.equals("YOUR_REST_API_KEY")) {
-                log.warn("Kakao REST API Key is missing or invalid. Falling back to Mock Adapter.");
-                return createFallbackRestaurants(menuName, location);
+                log.warn("Kakao REST API Key is missing or invalid. Returning empty list.");
+                return new ArrayList<>();
             }
 
             URI uri = UriComponentsBuilder.fromHttpUrl("https://dapi.kakao.com/v2/local/search/keyword.json")
@@ -51,8 +51,8 @@ public class KakaoLocalSearchAdapter implements RecommendRestaurantsPort {
                     .body(KakaoSearchResponse.class);
 
             if (response == null || response.getDocuments() == null || response.getDocuments().isEmpty()) {
-                log.warn("Kakao Search returned empty results for query '{}'. Falling back to Mock Adapter.", query);
-                return createFallbackRestaurants(menuName, location);
+                log.warn("Kakao Search returned empty results for query '{}'.", query);
+                return new ArrayList<>();
             }
 
             List<Restaurant> restaurants = new ArrayList<>();
@@ -83,6 +83,8 @@ public class KakaoLocalSearchAdapter implements RecommendRestaurantsPort {
                         .latitude(lat)
                         .longitude(lng)
                         .phone(doc.getPhone() != null ? doc.getPhone() : "")
+                        .category(doc.getCategory_group_name() != null ? doc.getCategory_group_name() : "")
+                        .placeUrl(doc.getPlace_url() != null ? doc.getPlace_url() : "")
                         .build());
             }
 
@@ -90,60 +92,9 @@ public class KakaoLocalSearchAdapter implements RecommendRestaurantsPort {
             return restaurants;
 
         } catch (Exception e) {
-            log.error("Error occurred while calling Kakao Local API for query '{}'. Falling back to Mock Adapter.", query, e);
-            return createFallbackRestaurants(menuName, location);
+            log.error("Error occurred while calling Kakao Local API for query '{}'. Returning empty list.", query, e);
+            return new ArrayList<>();
         }
-    }
-
-    private List<Restaurant> createFallbackRestaurants(String menuName, String location) {
-        List<Restaurant> mockList = new ArrayList<>();
-
-        mockList.add(Restaurant.builder()
-                .id(UUID.randomUUID())
-                .name("명가 " + menuName + " 본점")
-                .address("서울시 강남구 " + location + "대로 456길 12")
-                .latitude(37.4981)
-                .longitude(127.0280)
-                .phone("02-111-2222")
-                .build());
-
-        mockList.add(Restaurant.builder()
-                .id(UUID.randomUUID())
-                .name(location + " " + menuName + " 천국")
-                .address("서울시 강남구 " + location + "로 789길 34")
-                .latitude(37.4975)
-                .longitude(127.0270)
-                .phone("02-333-4444")
-                .build());
-
-        mockList.add(Restaurant.builder()
-                .id(UUID.randomUUID())
-                .name("진짜 맛있는 " + menuName + "집")
-                .address("서울시 강남구 " + location + "동 101번지 1층")
-                .latitude(37.4990)
-                .longitude(127.0265)
-                .phone("02-555-6666")
-                .build());
-
-        mockList.add(Restaurant.builder()
-                .id(UUID.randomUUID())
-                .name("황금 " + menuName + " 하우스")
-                .address("서울시 강남구 " + location + "역 5번출구 바로 앞")
-                .latitude(37.4965)
-                .longitude(127.0290)
-                .phone("02-777-8888")
-                .build());
-
-        mockList.add(Restaurant.builder()
-                .id(UUID.randomUUID())
-                .name(menuName + " 대감")
-                .address("서울시 강남구 " + location + " 먹자골목 중심길 9")
-                .latitude(37.4985)
-                .longitude(127.0285)
-                .phone("02-999-0000")
-                .build());
-
-        return mockList;
     }
 
     @lombok.Data
@@ -159,5 +110,7 @@ public class KakaoLocalSearchAdapter implements RecommendRestaurantsPort {
         private String x;
         private String y;
         private String phone;
+        private String category_group_name;
+        private String place_url;
     }
 }

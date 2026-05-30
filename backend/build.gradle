@@ -73,3 +73,11 @@ task copyFrontendToStatic(type: Copy) {
 
 processResources.dependsOn copyFrontendToStatic
 
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+bootRun {
+    systemProperty 'file.encoding', 'UTF-8'
+    jvmArgs = ["-Dfile.encoding=UTF-8"]
+}

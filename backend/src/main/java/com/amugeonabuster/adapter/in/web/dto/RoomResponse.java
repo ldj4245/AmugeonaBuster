@@ -8,6 +8,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -24,6 +25,15 @@ public class RoomResponse {
     private final List<String> defaultMenus;
     private final int totalMembers;
     private final int completedMembersCount;
+    private final List<MenuVoteStat> voteStats;
+
+    @Getter
+    @Builder
+    public static class MenuVoteStat {
+        private final String menuName;
+        private final long likes;
+        private final long dislikes;
+    }
 
     /**
      * 도메인 객체로부터 API 응답 포맷으로 고속 변환
@@ -58,6 +68,25 @@ public class RoomResponse {
                 })
                 .count();
 
+        // 메뉴별 투표 통계 집계 (좋아요/싫어요)
+        List<MenuVoteStat> voteStats = DefaultMenus.MENUS.stream()
+                .map(menu -> {
+                    long likes = room.getSwipes().stream()
+                            .filter(s -> s.getMenuName().equals(menu) && s.isLike())
+                            .count();
+                    long dislikes = room.getSwipes().stream()
+                            .filter(s -> s.getMenuName().equals(menu) && !s.isLike())
+                            .count();
+                    return MenuVoteStat.builder()
+                            .menuName(menu)
+                            .likes(likes)
+                            .dislikes(dislikes)
+                            .build();
+                })
+                .filter(stat -> stat.getLikes() > 0 || stat.getDislikes() > 0)
+                .sorted((a, b) -> Long.compare(b.getLikes(), a.getLikes()))
+                .collect(Collectors.toList());
+
         return RoomResponse.builder()
                 .roomId(room.getId())
                 .hostId(room.getHostId())
@@ -69,6 +98,7 @@ public class RoomResponse {
                 .defaultMenus(DefaultMenus.MENUS)
                 .totalMembers(room.getMembers().size())
                 .completedMembersCount((int) completedCount)
+                .voteStats(voteStats)
                 .build();
     }
 }

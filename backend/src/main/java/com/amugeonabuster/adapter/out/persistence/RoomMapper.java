@@ -44,6 +44,8 @@ public class RoomMapper {
                         .latitude(restaurantEntity.getLatitude())
                         .longitude(restaurantEntity.getLongitude())
                         .phone(restaurantEntity.getPhone())
+                        .category(restaurantEntity.getCategory())
+                        .placeUrl(restaurantEntity.getPlaceUrl())
                         .build())
                 .collect(Collectors.toList());
 
@@ -104,6 +106,8 @@ public class RoomMapper {
                     .latitude(domainRestaurant.getLatitude())
                     .longitude(domainRestaurant.getLongitude())
                     .phone(domainRestaurant.getPhone())
+                    .category(domainRestaurant.getCategory())
+                    .placeUrl(domainRestaurant.getPlaceUrl())
                     .build();
             jpaEntity.addRestaurant(restaurantJpaEntity);
         });

@@ -16,10 +16,17 @@ export interface WebSocketRoomResponse {
     latitude: number;
     longitude: number;
     phone?: string;
+    category?: string;
+    placeUrl?: string;
   }>;
   defaultMenus: string[];
   totalMembers: number;
   completedMembersCount: number;
+  voteStats?: Array<{
+    menuName: string;
+    likes: number;
+    dislikes: number;
+  }>;
 }
 
 export function useWebSocket(
@@ -31,7 +38,8 @@ export function useWebSocket(
   useEffect(() => {
     if (!roomId) return;
 
-    const socketUrl = window.location.hostname === 'localhost'
+    const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const socketUrl = isLocalDev
       ? 'http://localhost:8080/ws-connection'
       : `${window.location.origin}/ws-connection`;
     const client = new Client({

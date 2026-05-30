@@ -15,6 +15,8 @@ public class WebSocketRestaurantResponse {
     private final double latitude;
     private final double longitude;
     private final String phone;
+    private final String category;
+    private final String placeUrl;
 
     public static WebSocketRestaurantResponse fromDomain(Restaurant restaurant) {
         if (restaurant == null) {
@@ -27,6 +29,8 @@ public class WebSocketRestaurantResponse {
                 .latitude(restaurant.getLatitude())
                 .longitude(restaurant.getLongitude())
                 .phone(restaurant.getPhone())
+                .category(restaurant.getCategory())
+                .placeUrl(restaurant.getPlaceUrl())
                 .build();
     }
 }

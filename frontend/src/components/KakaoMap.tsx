@@ -8,6 +8,8 @@ interface Restaurant {
   latitude: number;
   longitude: number;
   phone?: string;
+  category?: string;
+  placeUrl?: string;
 }
 
 interface KakaoMapProps {
@@ -141,39 +143,46 @@ export function KakaoMap({ matchedRestaurants, location }: KakaoMapProps) {
 
         const content = `
           <div style="
-            padding: 10px;
-            width: 200px;
-            background: rgba(255, 255, 255, 0.98);
-            border-radius: 12px;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            border: 1px solid rgba(226, 232, 240, 0.8);
+            padding: 12px;
+            width: 220px;
+            background: #ffffff;
+            border-radius: 14px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            border: 1px solid #e5e7eb;
             text-align: left;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
           ">
-            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
               <span style="
                 background: #f43f5e;
                 color: white;
                 font-weight: 800;
                 font-size: 10px;
-                width: 16px;
-                height: 16px;
-                border-radius: 4px;
+                min-width: 18px;
+                height: 18px;
+                border-radius: 5px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                padding: 0 3px;
               ">${index + 1}</span>
-              <strong style="color: #1e293b; font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; display: inline-block;">
-                ${res.name}
-              </strong>
+              <strong style="color: #111827; font-size: 13px; font-weight: 700; line-height: 1.3;">${res.name}</strong>
             </div>
-            <div style="font-size: 10px; color: #64748b; margin-bottom: 4px; line-height: 1.3;">
-              📍 ${res.address}
-            </div>
-            ${res.phone ? `
-              <div style="font-size: 10px; color: #ef4444; font-weight: 600; display: flex; align-items: center; gap: 3px;">
-                📞 ${res.phone}
-              </div>
-            ` : ''}
+            ${res.category ? `<div style="display: inline-block; background: #fff7ed; color: #ea580c; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 10px; margin-bottom: 5px; border: 1px solid #fed7aa;">${res.category}</div>` : ''}
+            <div style="font-size: 10px; color: #6b7280; margin-bottom: ${res.phone || res.placeUrl ? '6px' : '0'}; line-height: 1.4;">📍 ${res.address}</div>
+            ${res.phone ? `<div style="font-size: 10px; color: #ef4444; font-weight: 600; margin-bottom: ${res.placeUrl ? '6px' : '0'};">📞 ${res.phone}</div>` : ''}
+            ${res.placeUrl ? `<a href="${res.placeUrl}" target="_blank" style="
+              display: block;
+              background: #fee2e2;
+              color: #b91c1c;
+              font-size: 10px;
+              font-weight: 700;
+              text-align: center;
+              padding: 5px 0;
+              border-radius: 8px;
+              text-decoration: none;
+              margin-top: 2px;
+            ">🗺️ 카카오맵에서 보기</a>` : ''}
           </div>
         `;
 

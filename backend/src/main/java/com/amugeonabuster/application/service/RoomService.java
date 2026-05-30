@@ -113,10 +113,10 @@ public class RoomService implements CreateRoomUseCase, JoinRoomUseCase, StartVot
             room.associateMatchedRestaurants(recommended);
         }
 
-        saveRoomPort.saveRoom(room);
-
-        // 실시간 소켓 브로드캐스트 (투표 누적 게이지 바 및 최종 매칭 완료 통지)
+        // 실시간 소켓 브로드캐스트를 saveRoom 이전에 실행 → swipes가 in-memory에 온전히 살아있을 때 voteStats 계산 보장
         broadcastRoomStatePort.broadcastRoomState(room);
+
+        saveRoomPort.saveRoom(room);
 
         return room;
     }
