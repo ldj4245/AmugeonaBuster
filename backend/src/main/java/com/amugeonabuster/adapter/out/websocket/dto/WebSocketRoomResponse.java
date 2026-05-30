@@ -69,7 +69,7 @@ public class WebSocketRoomResponse {
                 .count();
 
         // 메뉴별 투표 통계 집계 (좋아요/싫어요) — broadcastRoomState 시점에 room이 in-memory swipes를 보유하고 있으므로 정확히 집계됨
-        List<MenuVoteStat> voteStats = DefaultMenus.MENUS.subList(0, room.getMaxSwipeCount()).stream()
+        List<MenuVoteStat> voteStats = room.getCustomMenus().stream()
                 .map(menu -> {
                     long likes = room.getSwipes().stream()
                             .filter(s -> s.getMenuName().equals(menu) && s.isLike())
@@ -95,7 +95,7 @@ public class WebSocketRoomResponse {
                 .members(memberResponses)
                 .winningMenu(room.getWinningMenu())
                 .matchedRestaurants(restaurantResponses)
-                .defaultMenus(DefaultMenus.MENUS.subList(0, room.getMaxSwipeCount()))
+                .defaultMenus(room.getCustomMenus())
                 .totalMembers(room.getMembers().size())
                 .completedMembersCount((int) completedCount)
                 .voteStats(voteStats)

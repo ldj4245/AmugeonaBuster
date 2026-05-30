@@ -49,6 +49,11 @@ public class RoomMapper {
                         .build())
                 .collect(Collectors.toList());
 
+        List<String> domainCustomMenus = List.of();
+        if (jpaEntity.getCustomMenus() != null && !jpaEntity.getCustomMenus().isEmpty()) {
+            domainCustomMenus = List.of(jpaEntity.getCustomMenus().split(","));
+        }
+
         return Room.builder()
                 .id(jpaEntity.getId())
                 .hostId(jpaEntity.getHostId())
@@ -59,6 +64,7 @@ public class RoomMapper {
                 .swipes(domainSwipes)
                 .winningMenu(jpaEntity.getWinningMenu())
                 .matchedRestaurants(domainRestaurants)
+                .customMenus(domainCustomMenus)
                 .build();
     }
 
@@ -70,6 +76,11 @@ public class RoomMapper {
             return null;
         }
 
+        String customMenusStr = "";
+        if (domainModel.getCustomMenus() != null && !domainModel.getCustomMenus().isEmpty()) {
+            customMenusStr = String.join(",", domainModel.getCustomMenus());
+        }
+
         RoomJpaEntity jpaEntity = RoomJpaEntity.builder()
                 .id(domainModel.getId())
                 .hostId(domainModel.getHostId())
@@ -77,6 +88,7 @@ public class RoomMapper {
                 .status(domainModel.getStatus())
                 .maxSwipeCount(domainModel.getMaxSwipeCount())
                 .winningMenu(domainModel.getWinningMenu())
+                .customMenus(customMenusStr)
                 .build();
 
         // 도메인 내부에 격리된 멤버들을 양방향 JPA Entity 관계로 바인딩

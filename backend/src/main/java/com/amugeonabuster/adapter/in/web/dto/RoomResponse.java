@@ -70,7 +70,7 @@ public class RoomResponse {
                 .count();
 
         // 메뉴별 투표 통계 집계 (좋아요/싫어요) - 활성화된 서브리스트만 집계
-        List<MenuVoteStat> voteStats = DefaultMenus.MENUS.subList(0, room.getMaxSwipeCount()).stream()
+        List<MenuVoteStat> voteStats = room.getCustomMenus().stream()
                 .map(menu -> {
                     long likes = room.getSwipes().stream()
                             .filter(s -> s.getMenuName().equals(menu) && s.isLike())
@@ -96,7 +96,7 @@ public class RoomResponse {
                 .members(memberResponses)
                 .winningMenu(room.getWinningMenu())
                 .matchedRestaurants(restaurantResponses)
-                .defaultMenus(DefaultMenus.MENUS.subList(0, room.getMaxSwipeCount()))
+                .defaultMenus(room.getCustomMenus())
                 .totalMembers(room.getMembers().size())
                 .completedMembersCount((int) completedCount)
                 .voteStats(voteStats)

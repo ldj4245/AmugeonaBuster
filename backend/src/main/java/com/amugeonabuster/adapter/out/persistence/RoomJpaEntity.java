@@ -33,6 +33,9 @@ public class RoomJpaEntity {
     @Column(nullable = false)
     private int maxSwipeCount;
 
+    @Column(nullable = false, length = 1000)
+    private String customMenus;
+
     @OneToMany(mappedBy = "room", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<MemberJpaEntity> members = new ArrayList<>();
 
@@ -45,7 +48,7 @@ public class RoomJpaEntity {
     private List<RestaurantJpaEntity> matchedRestaurants = new ArrayList<>();
 
     @Builder
-    public RoomJpaEntity(String id, UUID hostId, String location, RoomStatus status, int maxSwipeCount, List<MemberJpaEntity> members, List<SwipeJpaEntity> swipes, String winningMenu, List<RestaurantJpaEntity> matchedRestaurants) {
+    public RoomJpaEntity(String id, UUID hostId, String location, RoomStatus status, int maxSwipeCount, List<MemberJpaEntity> members, List<SwipeJpaEntity> swipes, String winningMenu, List<RestaurantJpaEntity> matchedRestaurants, String customMenus) {
         this.id = id;
         this.hostId = hostId;
         this.location = location;
@@ -55,6 +58,7 @@ public class RoomJpaEntity {
         this.swipes = swipes != null ? swipes : new ArrayList<>();
         this.winningMenu = winningMenu;
         this.matchedRestaurants = matchedRestaurants != null ? matchedRestaurants : new ArrayList<>();
+        this.customMenus = customMenus != null ? customMenus : "";
     }
 
     /**

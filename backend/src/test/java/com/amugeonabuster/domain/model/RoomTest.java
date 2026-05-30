@@ -258,4 +258,39 @@ class RoomTest {
         assertThat(expressRoom.getStatus()).isEqualTo(RoomStatus.COMPLETED);
         assertThat(expressRoom.getWinningMenu()).isEqualTo("삼겹살"); // 첫 번째 메뉴인 삼겹살 당선!
     }
+
+    @Test
+    @DisplayName("방장이 고유한 customMenus 리스트를 제공하면 maxSwipeCount가 개수와 맞고 해당 카드들로만 투표가 진행 및 완성된다")
+    void determineWinningMenu_custom_menus() {
+        // given
+        List<String> customList = List.of("치킨", "피자", "초밥");
+        Room customRoom = Room.builder()
+                .id("ROOM-CUSTOM")
+                .hostId(hostId)
+                .location("강남역")
+                .customMenus(customList)
+                .build();
+
+        assertThat(customRoom.getMaxSwipeCount()).isEqualTo(3);
+        assertThat(customRoom.getCustomMenus()).containsExactly("치킨", "피자", "초밥");
+
+        UUID user1 = UUID.randomUUID();
+        customRoom.joinMember(Member.builder().id(user1).nickname("유저1").build());
+        customRoom.startVoting(hostId);
+
+        // 오직 3개 커스텀 카드에 대해서만 투표 진행
+        customRoom.swipeMenu(user1, "치킨", false); // 싫어요
+        customRoom.swipeMenu(user1, "피자", true);  // 좋아요
+        customRoom.swipeMenu(user1, "초밥", true);  // 좋아요
+
+        // then
+        assertThat(customRoom.isAllMembersCompletedSwiping()).isTrue();
+
+        // when
+        customRoom.determineWinningMenu();
+
+        // then
+        assertThat(customRoom.getStatus()).isEqualTo(RoomStatus.COMPLETED);
+        assertThat(customRoom.getWinningMenu()).isEqualTo("피자"); // 피자가 타이브레이커 선순위이므로 당선!
+    }
 }
