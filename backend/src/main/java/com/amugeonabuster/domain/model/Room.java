@@ -22,11 +22,12 @@ public class Room {
     private final List<Swipe> swipes;
     private String winningMenu;
     private final List<Restaurant> matchedRestaurants;
+    private final int maxSwipeCount;
 
     private static final int MAX_MEMBER_SIZE = 10;
 
     @Builder
-    public Room(String id, UUID hostId, String location, RoomStatus status, List<Member> members, List<Swipe> swipes, String winningMenu, List<Restaurant> matchedRestaurants) {
+    public Room(String id, UUID hostId, String location, RoomStatus status, List<Member> members, List<Swipe> swipes, String winningMenu, List<Restaurant> matchedRestaurants, int maxSwipeCount) {
         this.id = id;
         this.hostId = hostId;
         this.location = location;
@@ -35,6 +36,7 @@ public class Room {
         this.swipes = swipes != null ? new ArrayList<>(swipes) : new ArrayList<>();
         this.winningMenu = winningMenu;
         this.matchedRestaurants = matchedRestaurants != null ? new ArrayList<>(matchedRestaurants) : new ArrayList<>();
+        this.maxSwipeCount = maxSwipeCount != 0 ? maxSwipeCount : 15;
     }
 
     /**
@@ -121,7 +123,7 @@ public class Room {
             return false;
         }
 
-        int targetMenuCount = DefaultMenus.MENUS.size();
+        int targetMenuCount = this.maxSwipeCount;
 
         for (Member m : this.members) {
             long uniqueSwipedCount = this.swipes.stream()
@@ -145,7 +147,7 @@ public class Room {
             throw new InvalidRoomStateException("투표 진행 중인 방만 최종 매칭을 완료할 수 있습니다.");
         }
 
-        List<String> allMenus = DefaultMenus.MENUS;
+        List<String> allMenus = DefaultMenus.MENUS.subList(0, this.maxSwipeCount);
         List<MenuScore> scores = new ArrayList<>();
 
         for (int i = 0; i < allMenus.size(); i++) {

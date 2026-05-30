@@ -54,6 +54,7 @@ public class RoomMapper {
                 .hostId(jpaEntity.getHostId())
                 .location(jpaEntity.getLocation())
                 .status(jpaEntity.getStatus())
+                .maxSwipeCount(jpaEntity.getMaxSwipeCount())
                 .members(domainMembers)
                 .swipes(domainSwipes)
                 .winningMenu(jpaEntity.getWinningMenu())
@@ -74,6 +75,7 @@ public class RoomMapper {
                 .hostId(domainModel.getHostId())
                 .location(domainModel.getLocation())
                 .status(domainModel.getStatus())
+                .maxSwipeCount(domainModel.getMaxSwipeCount())
                 .winningMenu(domainModel.getWinningMenu())
                 .build();
 
