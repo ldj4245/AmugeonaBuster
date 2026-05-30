@@ -121,6 +121,11 @@ function App() {
   const [isWelstoryModalOpen, setIsWelstoryModalOpen] = useState(false);
   const [welstorySettings, setWelstorySettings] = useState<any>(null);
 
+  // 🍱 실시간 조회 전용 로컬 식당 상태 (카카오 로그인 유무와 무관하게 즉시 전환 및 기억 기능 제공)
+  const [selectedCotNo, setSelectedCotNo] = useState<string>(() => localStorage.getItem('welstory_cotNo') || 'WEL_DSR');
+  const [selectedHallNo, setSelectedHallNo] = useState<string>(() => localStorage.getItem('welstory_hallNo') || 'HALL_01');
+  const [selectedCafeteriaName, setSelectedCafeteriaName] = useState<string>(() => localStorage.getItem('welstory_cafeteriaName') || '삼성 DSR 타워 웰스토리');
+
   // 🍱 웰스토리 알림 설정 전용 폼 상태 변수
   const [selectedPreset, setSelectedPreset] = useState<number | 'custom'>(0);
   const [customCotNo, setCustomCotNo] = useState('');
@@ -552,6 +557,15 @@ function App() {
       if (response.ok) {
         const saved = await response.json();
         setWelstorySettings(saved);
+        
+        // 로컬 조회용 상태 및 로컬 스토리지도 즉시 동기화!
+        localStorage.setItem('welstory_cotNo', saved.cotNo || 'WEL_DSR');
+        localStorage.setItem('welstory_hallNo', saved.hallNo || 'HALL_01');
+        localStorage.setItem('welstory_cafeteriaName', saved.cafeteriaName || '삼성 DSR 타워 웰스토리');
+        setSelectedCotNo(saved.cotNo || 'WEL_DSR');
+        setSelectedHallNo(saved.hallNo || 'HALL_01');
+        setSelectedCafeteriaName(saved.cafeteriaName || '삼성 DSR 타워 웰스토리');
+
         alert('🎉 알림 설정이 안전하게 저장되었습니다!');
         setIsWelstoryModalOpen(false);
       } else {
@@ -962,19 +976,14 @@ function App() {
           </div>
         )}
 
-        {!roomId && (() => {
-          const activeCotNo = welstorySettings?.cotNo || 'WEL_DSR';
-          const activeHallNo = welstorySettings?.hallNo || 'HALL_01';
-          const activeCafeteriaName = welstorySettings?.cafeteriaName || '삼성 DSR 타워 웰스토리';
-          return (
+         {!roomId && (
             <button
-              onClick={() => triggerFetchMenuDetails(activeCotNo, activeHallNo, activeCafeteriaName)}
+              onClick={() => triggerFetchMenuDetails(selectedCotNo, selectedHallNo, selectedCafeteriaName)}
               className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white px-4 py-2 rounded-xl text-xs font-black shadow-sm transition-all scale-100 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
               오늘의 식단표
             </button>
-          );
-        })()}
+         )}
       </header>
 
       {/* Main Container */}
@@ -1249,31 +1258,47 @@ function App() {
           {/* 독립 프리미엄 위젯 3형제 */}
           <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-6 mt-12 animate-slide-up">
             {/* 위젯 1: 실시간 식단표 */}
-            {(() => {
-              const activeCotNo = welstorySettings?.cotNo || 'WEL_DSR';
-              const activeHallNo = welstorySettings?.hallNo || 'HALL_01';
-              const activeCafeteriaName = welstorySettings?.cafeteriaName || '삼성 DSR 타워 웰스토리';
-              return (
-                <div className="bg-white border border-zinc-200 shadow-sm rounded-2xl p-6 flex flex-col justify-between gap-4 transition-all hover:shadow-md hover:border-orange-200">
-                  <div className="flex flex-col gap-2">
-                    <div className="w-12 h-12 flex items-center justify-center">
-                      <img src={meal3dIcon} alt="Meal Icon" className="w-full h-full object-contain" />
-                    </div>
-                    <h3 className="font-bold text-zinc-800 text-base mt-2">오늘의 구내식당 식단표</h3>
-                    <p className="text-xs text-zinc-500 leading-relaxed">
-                      현재 설정된 <span className="font-bold text-orange-600">[{activeCafeteriaName}]</span>의 실시간 코너별 식단과 메인 요리 이미지를 고해상도로 즉시 확인하세요.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => triggerFetchMenuDetails(activeCotNo, activeHallNo, activeCafeteriaName)}
-                    className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center cursor-pointer"
-                  >
-                    식단표 보기
-                  </button>
+            <div className="bg-white border border-zinc-200 shadow-sm rounded-2xl p-6 flex flex-col justify-between gap-4 transition-all hover:shadow-md hover:border-orange-200">
+              <div className="flex flex-col gap-2">
+                <div className="w-12 h-12 flex items-center justify-center">
+                  <img src={meal3dIcon} alt="Meal Icon" className="w-full h-full object-contain" />
                 </div>
-              );
-            })()}
+                <h3 className="font-bold text-zinc-800 text-base mt-2">오늘의 구내식당 식단표</h3>
+                <p className="text-xs text-zinc-500 leading-relaxed mb-1">
+                  현재 조회할 지점을 아래 드롭다운에서 자유롭게 전환해 보세요. (평일에는 실시간 데이터, 주말에는 특선 힐링 모의 식단이 노출됩니다.)
+                </p>
+                
+                {/* 🏢 카카오톡 연동 없이도 1초 만에 전환하는 프리미엄 지점 신속 선택 셀렉터 */}
+                <div className="flex flex-col gap-1 mt-1">
+                  <label className="text-[9px] font-black text-zinc-400 uppercase tracking-wider">🏢 구내식당 지점 신속 변경</label>
+                  <select 
+                    value={PRESETS.findIndex(p => p.cotNo === selectedCotNo)}
+                    onChange={(e) => {
+                      const idx = parseInt(e.target.value, 10);
+                      const p = PRESETS[idx];
+                      setSelectedCotNo(p.cotNo);
+                      setSelectedHallNo(p.hallNo);
+                      setSelectedCafeteriaName(p.name);
+                      localStorage.setItem('welstory_cotNo', p.cotNo);
+                      localStorage.setItem('welstory_hallNo', p.hallNo);
+                      localStorage.setItem('welstory_cafeteriaName', p.name);
+                    }}
+                    className="w-full text-xs font-black text-zinc-700 bg-zinc-50 hover:bg-zinc-100/70 border border-zinc-200 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-orange-500/20 cursor-pointer shadow-inner transition-all"
+                  >
+                    {PRESETS.map((p, idx) => (
+                      <option key={idx} value={idx}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => triggerFetchMenuDetails(selectedCotNo, selectedHallNo, selectedCafeteriaName)}
+                className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center cursor-pointer"
+              >
+                식단표 보기 🍱
+              </button>
+            </div>
 
             {/* 위젯 2: 스마트 카톡 식단 알림 */}
             <div className="bg-white border border-zinc-200 shadow-sm rounded-2xl p-6 flex flex-col justify-between gap-4 transition-all hover:shadow-md hover:border-amber-200">
