@@ -192,6 +192,33 @@ function App() {
   // 스와이프 방향을 임시 저장하는 Ref (재렌더링 방지 및 화면 이탈 시점 동기화)
   const swipeDirectionsRef = useRef<Record<string, string>>({});
 
+  // 빠른 스와이프 발생 시 HTTP 요청이 꼬이지 않도록 직렬화 처리용 비동기 큐
+  const swipeQueueRef = useRef<{ menuName: string; isLike: boolean }[]>([]);
+  const isProcessingQueueRef = useRef(false);
+
+  // 대기 중인 스와이프 큐를 순차적으로 꺼내서 서버로 전송 (JPA 동시성 손실 보장)
+  const processSwipeQueue = async () => {
+    if (isProcessingQueueRef.current || swipeQueueRef.current.length === 0) return;
+    isProcessingQueueRef.current = true;
+
+    try {
+      while (swipeQueueRef.current.length > 0) {
+        const nextSwipe = swipeQueueRef.current[0];
+        // submitSwipe가 완료되어 서버 상태(roomState)가 갱신될 때까지 대기
+        await submitSwipe(nextSwipe.menuName, nextSwipe.isLike);
+        swipeQueueRef.current.shift(); // 성공 및 완료 후 큐에서 제거
+      }
+    } catch (err) {
+      console.error('❌ Error processing swipe queue:', err);
+    } finally {
+      isProcessingQueueRef.current = false;
+      // 혹시 예외 발생 등으로 큐가 남아있을 경우를 대비해 다시 가동
+      if (swipeQueueRef.current.length > 0) {
+        processSwipeQueue();
+      }
+    }
+  };
+
   // Tinder 카드 스와이프 물리 이벤트 핸들러
   const handleCardSwipe = (direction: string, menuName: string) => {
     swipeDirectionsRef.current[menuName] = direction;
@@ -204,8 +231,10 @@ function App() {
     const isLike = direction === 'right';
     console.log(`👉 Card left screen: ${menuName} to the ${direction}`);
     
-    // API로 투표 전송
-    submitSwipe(menuName, isLike);
+    // 큐에 스와이프 삽입 후 순차적 처리 개시
+    swipeQueueRef.current.push({ menuName, isLike });
+    processSwipeQueue();
+
     setSwipeCount(prev => prev + 1);
   };
 
