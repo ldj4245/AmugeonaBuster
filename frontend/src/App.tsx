@@ -2009,7 +2009,7 @@ function App() {
 
             {/* 6. 모달 하단 퀵 액션 */}
             <div className="bg-zinc-50/80 border-t border-zinc-200 p-4 shrink-0 flex items-center justify-between gap-4 text-xs font-bold text-zinc-500 sm:px-6">
-              <span>💡 메뉴 클릭 및 가독성에 불만족하시면 우측 상단 기어 아이콘을 통해 알림 설정을 변경하세요.</span>
+              <span>💡 카카오톡 식단 알림의 발송 시간, 수신 요일, 대상 식당 지점은 우측 상단의 설정(⚙️) 아이콘을 통해 언제든지 자유롭게 수정하실 수 있습니다.</span>
               <button 
                 onClick={() => setIsMenuDetailOpen(false)}
                 className="px-4 py-2 bg-zinc-800 hover:bg-zinc-900 text-white rounded-lg transition-colors cursor-pointer shrink-0"
