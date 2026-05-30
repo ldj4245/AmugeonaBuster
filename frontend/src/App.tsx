@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Flame, Compass, Users, Sparkles, MapPin, ArrowRight, CheckCircle2, RefreshCw, Star, Phone, Info } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Flame, Compass, Users, Sparkles, MapPin, ArrowRight, CheckCircle2, RefreshCw, Phone, Info, AlertCircle } from 'lucide-react';
 import TinderCard from 'react-tinder-card';
 import { useWebSocket, WebSocketRoomResponse } from './hooks/useWebSocket';
 import { KakaoMap } from './components/KakaoMap';
@@ -13,18 +13,19 @@ const MENU_METADATA: Record<string, { emoji: string; category: string; descripti
   "돈카츠": { emoji: "🐷", category: "일식 / 튀김", description: "두툼한 등심을 바삭하게 튀겨낸 겉바속촉 카츠!", gradient: "from-amber-500 to-yellow-600" },
   "라멘": { emoji: "🍜", category: "일식 / 면류", description: "진한 돈코츠 육수에 차슈가 듬뿍 들어간 라멘!", gradient: "from-yellow-500 to-amber-600" },
   "짜장면": { emoji: "🥢", category: "중식 / 면류", description: "달콤 짭조름한 춘장 소스에 슥슥 비벼 먹는 별미!", gradient: "from-zinc-700 to-black" },
-  "짬뽕": { emoji: "🌶️", category: "중식 / 매콤면", description: "해물 베이스의 얼큰하고 불맛 가득한 빨간 국물!", gradient: "from-red-600 to-rose-700" },
-  "마라탕": { emoji: "🥘", category: "아시안 / 매운맛", description: "혀끝이 얼얼해지는 중독성 최강의 트렌디 마라탕!", gradient: "from-rose-500 to-red-700" },
+  "짬뽕": { emoji: "🌶️", category: "중식 / 매콤면", description: "해물 베이스의 얼큰하고 불맛 가득한 빨간 국물!", gradient: "from-red-600 to-red-800" },
+  "마라탕": { emoji: "🥘", category: "아시안 / 매운맛", description: "혀끝이 얼얼해지는 중독성 최강의 트렌디 마라탕!", gradient: "from-red-500 to-red-700" },
   "피자": { emoji: "🍕", category: "양식 / 피자", description: "고소한 치즈가 길게 늘어나는 맛의 끝판왕 피자!", gradient: "from-yellow-400 to-red-500" },
   "파스타": { emoji: "🍝", category: "양식 / 면류", description: "크림, 토마토, 오일 등 취향대로 고르는 우아한 파스타!", gradient: "from-emerald-400 to-teal-600" },
   "스테이크": { emoji: "🥩", category: "양식 / 고기", description: "육즙을 꽉 잡아 미디엄으로 구워낸 명품 스테이크!", gradient: "from-stone-600 to-red-900" },
-  "떡볶이": { emoji: "🌶️", category: "분식 / 매운맛", description: "쫄깃한 떡과 어묵에 매콤달콤 양념이 쏙 벤 국민 분식!", gradient: "from-rose-500 to-amber-500" },
+  "떡볶이": { emoji: "🌶️", category: "분식 / 매운맛", description: "쫄깃한 떡과 어묵에 매콤달콤 양념이 쏙 벤 국민 분식!", gradient: "from-red-500 to-amber-500" },
   "쌀국수": { emoji: "🍜", category: "아시안 / 면류", description: "깔끔하고 담백한 육수에 고수와 양지가 어우러진 쌀국수!", gradient: "from-teal-400 to-emerald-600" },
   "팟타이": { emoji: "🍳", category: "아시안 / 볶음면", description: "새콤달콤 소스에 새우와 두부를 볶아낸 태국 대표 요리!", gradient: "from-amber-400 to-emerald-500" }
 };
 
-const BASE_URL = window.location.hostname === 'localhost'
-  ? 'http://localhost:8080/api/rooms'
+const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const BASE_URL = isLocalDev
+  ? `http://localhost:8080/api/rooms`
   : `${window.location.origin}/api/rooms`;
 
 function App() {
@@ -188,10 +189,20 @@ function App() {
     }
   };
 
+  // 스와이프 방향을 임시 저장하는 Ref (재렌더링 방지 및 화면 이탈 시점 동기화)
+  const swipeDirectionsRef = useRef<Record<string, string>>({});
+
   // Tinder 카드 스와이프 물리 이벤트 핸들러
   const handleCardSwipe = (direction: string, menuName: string) => {
-    const isLike = direction === 'right';
+    swipeDirectionsRef.current[menuName] = direction;
     console.log(`👉 Swiped ${menuName} to the ${direction}`);
+  };
+
+  // Tinder 카드 화면 이탈 완료 핸들러 (애니메이션이 끝난 후 상태 갱신)
+  const handleCardLeftScreen = (menuName: string) => {
+    const direction = swipeDirectionsRef.current[menuName] || 'left';
+    const isLike = direction === 'right';
+    console.log(`👉 Card left screen: ${menuName} to the ${direction}`);
     
     // API로 투표 전송
     submitSwipe(menuName, isLike);
@@ -217,47 +228,44 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-rose-50 via-slate-50 to-rose-100 flex flex-col justify-between relative overflow-hidden">
-      {/* Decorative Blur Orbs */}
-      <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] rounded-full bg-rose-200/40 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-rose-300/30 blur-[100px] pointer-events-none" />
+    <div className="min-h-screen bg-stone-50 flex flex-col justify-between">
 
       {/* Header */}
-      <header className="max-w-6xl mx-auto w-full px-6 py-5 flex items-center justify-between z-10">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={resetSession}>
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-600 to-orange-400 flex items-center justify-center text-white shadow-lg shadow-rose-500/20">
-            <Flame className="w-5 h-5 animate-pulse" />
+      <header className="max-w-5xl mx-auto w-full px-6 py-5 flex items-center justify-between">
+        <div className="flex items-center gap-2.5 cursor-pointer" onClick={resetSession}>
+          <div className="w-9 h-9 rounded-lg bg-orange-500 flex items-center justify-center text-white">
+            <Flame className="w-4.5 h-4.5" />
           </div>
-          <span className="text-xl font-bold tracking-tight text-slate-800">
-            오늘 뭐 먹지<span className="text-rose-500 font-extrabold">?</span>
+          <span className="text-lg font-bold text-zinc-800">
+            오늘 뭐 먹지?
           </span>
         </div>
         
         {roomId && roomState && (
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex bg-slate-800 text-white px-3 py-1.5 rounded-full text-xs font-bold items-center gap-1.5 shadow-sm">
+            <div className="hidden sm:flex bg-zinc-800 text-white px-3 py-1.5 rounded-lg text-xs font-medium items-center gap-1.5">
               <Users className="w-3.5 h-3.5" />
-              {roomState.members.find(m => m.id === myMemberId)?.nickname} (참가중)
+              {roomState.members.find(m => m.id === myMemberId)?.nickname}
             </div>
             <button 
               onClick={resetSession}
-              className="text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-100/60 hover:bg-rose-100/90 px-3 py-1.5 rounded-full border border-rose-200/40 transition-all"
+              className="text-xs font-medium text-zinc-500 hover:text-zinc-700 bg-white hover:bg-zinc-50 px-3 py-1.5 rounded-lg border border-zinc-200 transition-colors"
             >
-              처음으로
+              나가기
             </button>
           </div>
         )}
       </header>
 
       {/* Main Container */}
-      <main className="max-w-6xl mx-auto w-full px-6 py-6 flex-grow flex flex-col justify-center items-center z-10">
+      <main className="max-w-5xl mx-auto w-full px-6 py-6 flex-grow flex flex-col justify-center items-center">
         
         {/* Error Notification */}
         {errorMessage && (
-          <div className="w-full max-w-md bg-red-50 border border-red-200 rounded-2xl p-4 mb-6 shadow-sm flex items-start gap-3 animate-bounce">
-            <div className="text-red-500 mt-0.5">⚠️</div>
+          <div className="w-full max-w-md bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-start gap-3">
+            <Info className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
             <div className="flex-1">
-              <h4 className="text-sm font-bold text-red-800">시스템 연동 실패</h4>
+              <h4 className="text-sm font-semibold text-red-800">오류 발생</h4>
               <p className="text-xs text-red-600 mt-0.5">{errorMessage}</p>
             </div>
           </div>
@@ -265,200 +273,195 @@ function App() {
 
         {/* ==================== 1. LANDING PHASE ==================== */}
         {!roomId && (
-          <div className="w-full grid md:grid-cols-12 gap-12 items-center">
-            {/* Copywriting */}
-            <div className="md:col-span-7 flex flex-col gap-6 text-center md:text-left">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-rose-100/80 backdrop-blur-sm border border-rose-200/50 text-rose-600 text-xs font-bold rounded-full w-fit mx-auto md:mx-0 shadow-sm shadow-rose-100/10">
-                🔥 10초 만에 끝내는 실시간 미식 의사결정
-              </div>
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 leading-tight tracking-tight">
+          <div className="w-full grid md:grid-cols-12 gap-10 items-center">
+            {/* Left: Hero Copy */}
+            <div className="md:col-span-7 flex flex-col gap-5 text-center md:text-left">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-zinc-900 leading-tight">
                 약속 메뉴 정할 땐,<br />
-                <span className="bg-gradient-to-r from-rose-500 via-orange-500 to-amber-500 bg-clip-text text-transparent">
-                  카드를 밀어서 스와이프!
-                </span>
+                <span className="text-orange-500">스와이프 한 번이면 끝</span>
               </h1>
-              <p className="text-slate-600 text-base sm:text-lg max-w-lg leading-relaxed mx-auto md:mx-0">
-                더 이상의 "아무거나"는 거절합니다. 친구들과 실시간 방에 모여 각자 메뉴 카드를 스와이프 하세요. 
-                비토(싫어요) 방지 및 보정 알고리즘을 통해 최상의 타협점 맛집을 실시간 도출합니다.
+              <p className="text-zinc-500 text-sm sm:text-base max-w-md leading-relaxed mx-auto md:mx-0">
+                더 이상 "아무거나"는 없습니다. 친구들과 실시간으로 메뉴 카드를 밀어서 투표하면, 모두가 만족할 메뉴를 찾아드려요.
               </p>
 
-              {/* Feature Grid */}
-              <div className="grid grid-cols-3 gap-4 mt-4 max-w-md mx-auto md:mx-0">
-                <div className="bg-white/60 backdrop-blur-sm p-4 rounded-2xl border border-slate-200/50 flex flex-col items-center md:items-start gap-2 shadow-sm hover:scale-105 transition-all">
-                  <Users className="w-5 h-5 text-rose-500" />
-                  <span className="text-xs font-bold text-slate-700">실시간 대기실</span>
+              {/* Feature Pills */}
+              <div className="flex flex-wrap gap-3 mt-2 justify-center md:justify-start">
+                <div className="flex items-center gap-2 bg-white border border-zinc-200 px-4 py-2.5 rounded-lg text-sm text-zinc-700">
+                  <Users className="w-4 h-4 text-orange-500" />
+                  실시간 대기실
                 </div>
-                <div className="bg-white/60 backdrop-blur-sm p-4 rounded-2xl border border-slate-200/50 flex flex-col items-center md:items-start gap-2 shadow-sm hover:scale-105 transition-all">
-                  <Flame className="w-5 h-5 text-rose-500" />
-                  <span className="text-xs font-bold text-slate-700">Tinder 스와이프</span>
+                <div className="flex items-center gap-2 bg-white border border-zinc-200 px-4 py-2.5 rounded-lg text-sm text-zinc-700">
+                  <Flame className="w-4 h-4 text-orange-500" />
+                  스와이프 투표
                 </div>
-                <div className="bg-white/60 backdrop-blur-sm p-4 rounded-2xl border border-slate-200/50 flex flex-col items-center md:items-start gap-2 shadow-sm hover:scale-105 transition-all">
-                  <Compass className="w-5 h-5 text-rose-500" />
-                  <span className="text-xs font-bold text-slate-700">맛집 매칭 지도</span>
+                <div className="flex items-center gap-2 bg-white border border-zinc-200 px-4 py-2.5 rounded-lg text-sm text-zinc-700">
+                  <Compass className="w-4 h-4 text-orange-500" />
+                  맛집 매칭 지도
                 </div>
               </div>
             </div>
 
-            {/* Setup Form Card (Glassmorphism) */}
-            <div className="md:col-span-5 w-full max-w-md mx-auto relative">
-              <div className="absolute inset-0 bg-gradient-to-tr from-rose-600/10 to-amber-500/10 rounded-3xl blur-2xl pointer-events-none" />
-              <div className="bg-white/80 backdrop-blur-xl border border-white/60 shadow-2xl shadow-rose-200/30 rounded-3xl p-8 relative z-10">
-                
-                {/* View Tabs */}
-                <div className="flex border-b border-slate-200/80 mb-6">
-                  <button 
-                    onClick={() => { setIsJoinView(false); setErrorMessage(null); }}
-                    className={`flex-1 pb-3 text-sm font-bold transition-all border-b-2 ${!isJoinView ? 'border-rose-500 text-rose-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-                  >
-                    🚀 방 개설하기
-                  </button>
-                  <button 
-                    onClick={() => { setIsJoinView(true); setErrorMessage(null); }}
-                    className={`flex-1 pb-3 text-sm font-bold transition-all border-b-2 ${isJoinView ? 'border-rose-500 text-rose-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-                  >
-                    🔗 방 참여하기
-                  </button>
-                </div>
-
-                {!isJoinView ? (
-                  /* CREATE ROOM FORM */
-                  <form onSubmit={handleCreateRoom} className="flex flex-col gap-4">
-                    <p className="text-xs text-slate-500">대기실을 만들고 친구들에게 초대 코드를 공유해 투표를 시작하세요.</p>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-bold text-slate-600 px-1">닉네임</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="예: 김방장"
-                        value={nickname}
-                        onChange={(e) => setNickname(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white/50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-semibold"
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-bold text-slate-600 px-1">약속 기준 장소</label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          required
-                          placeholder="예: 강남역, 홍대입구"
-                          value={location}
-                          onChange={(e) => setLocation(e.target.value)}
-                          className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 bg-white/50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-semibold"
-                        />
-                        <MapPin className="w-5 h-5 text-slate-400 absolute left-4 top-3.5" />
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full mt-2 py-4 rounded-xl bg-gradient-to-r from-rose-600 to-orange-500 hover:from-rose-600 hover:to-orange-600 text-white font-bold text-sm tracking-wide shadow-lg shadow-rose-500/20 transition-all flex items-center justify-center gap-2 group disabled:opacity-70"
-                    >
-                      {loading ? (
-                        <RefreshCw className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <>
-                          대기실 생성 및 코드 발급
-                          <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                        </>
-                      )}
-                    </button>
-                  </form>
-                ) : (
-                  /* JOIN ROOM FORM */
-                  <form onSubmit={handleJoinRoom} className="flex flex-col gap-4">
-                    <p className="text-xs text-slate-500">친구에게 받은 방 고유 코드(예: ROOM-XXXXXX)를 입력해 참가하세요.</p>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-bold text-slate-600 px-1">초대 코드</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="예: ROOM-A7B8C9"
-                        value={roomCodeInput}
-                        onChange={(e) => setRoomCodeInput(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white/50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-mono font-bold tracking-wider"
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-bold text-slate-600 px-1">나의 닉네임</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="예: 홍길동"
-                        value={nickname}
-                        onChange={(e) => setNickname(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white/50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-semibold"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full mt-2 py-4 rounded-xl bg-gradient-to-r from-orange-500 to-rose-600 hover:from-orange-600 hover:to-rose-700 text-white font-bold text-sm tracking-wide shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center gap-2 group disabled:opacity-70"
-                    >
-                      {loading ? (
-                        <RefreshCw className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <>
-                          대기실 입장하기
-                          <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                        </>
-                      )}
-                    </button>
-                  </form>
-                )}
+            {/* Right: Setup Form Card */}
+            <div className="md:col-span-5 w-full max-w-md mx-auto">
+            <div className="w-full bg-white border border-zinc-200 shadow-sm rounded-xl p-7">
+              
+              {/* View Tabs */}
+              <div className="flex border-b border-zinc-200 mb-6">
+                <button 
+                  onClick={() => { setIsJoinView(false); setErrorMessage(null); }}
+                  className={`flex-1 pb-3 text-sm font-medium transition-colors border-b-2 ${!isJoinView ? 'border-orange-500 text-orange-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}
+                >
+                  방 만들기
+                </button>
+                <button 
+                  onClick={() => { setIsJoinView(true); setErrorMessage(null); }}
+                  className={`flex-1 pb-3 text-sm font-medium transition-colors border-b-2 ${isJoinView ? 'border-orange-500 text-orange-600' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}
+                >
+                  참여하기
+                </button>
               </div>
+
+              {!isJoinView ? (
+                /* CREATE ROOM FORM */
+                <form onSubmit={handleCreateRoom} className="flex flex-col gap-4">
+                  <p className="text-xs text-zinc-500">대기실을 만들고 친구들에게 초대 코드를 공유하세요.</p>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-zinc-600 px-1">닉네임</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="예: 김방장"
+                      value={nickname}
+                      onChange={(e) => setNickname(e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg border border-zinc-200 bg-white text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-zinc-600 px-1">약속 장소</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        required
+                        placeholder="예: 강남역, 홍대입구"
+                        value={location}
+                        onChange={(e) => setLocation(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 rounded-lg border border-zinc-200 bg-white text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                      />
+                      <MapPin className="w-4 h-4 text-zinc-400 absolute left-3.5 top-3.5" />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full mt-2 py-3.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+                  >
+                    {loading ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        대기실 만들기
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                </form>
+              ) : (
+                /* JOIN ROOM FORM */
+                <form onSubmit={handleJoinRoom} className="flex flex-col gap-4">
+                  <p className="text-xs text-zinc-500">친구에게 받은 초대 코드를 입력해서 참가하세요.</p>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-zinc-600 px-1">초대 코드</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="예: ROOM-A7B8C9"
+                      value={roomCodeInput}
+                      onChange={(e) => setRoomCodeInput(e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg border border-zinc-200 bg-white text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors font-mono tracking-wider"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-zinc-600 px-1">닉네임</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="예: 홍길동"
+                      value={nickname}
+                      onChange={(e) => setNickname(e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg border border-zinc-200 bg-white text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full mt-2 py-3.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+                  >
+                    {loading ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        참여하기
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
+            </div>
             </div>
           </div>
         )}
 
         {/* ==================== 2. LOBBY PHASE ==================== */}
         {roomId && roomState && roomState.status === 'LOBBY' && (
-          <div className="w-full max-w-2xl bg-white/80 backdrop-blur-xl border border-white/60 shadow-2xl rounded-3xl p-8 relative">
-            <div className="absolute top-6 right-6 flex items-center gap-1.5 bg-rose-100 text-rose-600 text-xs font-extrabold px-3 py-1 rounded-full border border-rose-200/50">
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-              실시간 동기화 활성
+          <div className="w-full max-w-xl bg-white border border-zinc-200 shadow-sm rounded-xl p-7 relative">
+            <div className="absolute top-5 right-5 flex items-center gap-1.5 text-emerald-600 text-xs font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              실시간 연결됨
             </div>
 
-            <div className="flex flex-col gap-2">
-              <span className="text-xs font-bold text-rose-500 tracking-wider uppercase">LOBBY 대기방</span>
-              <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-orange-500 uppercase tracking-wide">대기실</span>
+              <h2 className="text-2xl font-bold text-zinc-800">
                 친구들을 기다리는 중
               </h2>
-              <p className="text-slate-500 text-xs mt-1">방장이 게임 시작 버튼을 누르면 실시간 카드 스와이프가 개시됩니다.</p>
+              <p className="text-zinc-500 text-xs mt-1">방장이 시작 버튼을 누르면 투표가 시작됩니다.</p>
             </div>
 
-            {/* Room Info Cards */}
-            <div className="grid grid-cols-2 gap-4 mt-6">
-              <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl">
-                <span className="text-slate-400 text-xs block font-medium">초대 링크 (클릭 시 복사)</span>
+            {/* Room Info */}
+            <div className="grid grid-cols-2 gap-3 mt-6">
+              <div className="bg-zinc-50 border border-zinc-100 p-4 rounded-lg">
+                <span className="text-zinc-400 text-xs block">초대 코드</span>
                 <button 
                   onClick={copyInviteLink}
-                  className="text-lg font-mono font-black text-slate-800 mt-1 hover:text-rose-500 transition-all flex items-center gap-2 border-b border-dashed border-slate-300"
+                  className="text-base font-mono font-bold text-zinc-800 mt-1 hover:text-orange-500 transition-colors flex items-center gap-1.5"
                 >
-                  {roomState.roomId} 🔗
+                  {roomState.roomId}
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
 
-              <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl">
-                <span className="text-slate-400 text-xs block font-medium">약속 장소 기준</span>
-                <span className="text-lg font-bold text-slate-800 mt-1 block flex items-center gap-1.5">
-                  📍 {roomState.location}
+              <div className="bg-zinc-50 border border-zinc-100 p-4 rounded-lg">
+                <span className="text-zinc-400 text-xs block">약속 장소</span>
+                <span className="text-base font-medium text-zinc-800 mt-1 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-zinc-400" />
+                  {roomState.location}
                 </span>
               </div>
             </div>
 
-            {/* Member List Grid */}
-            <div className="mt-8">
-              <h3 className="text-sm font-bold text-slate-600 flex items-center gap-1.5 mb-4">
-                <Users className="w-4 h-4 text-slate-400" />
-                참여 중인 친구들 ({roomState.members.length}명)
+            {/* Member List */}
+            <div className="mt-7">
+              <h3 className="text-sm font-medium text-zinc-600 flex items-center gap-1.5 mb-3">
+                <Users className="w-4 h-4 text-zinc-400" />
+                참여자 ({roomState.members.length}명)
               </h3>
               
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                 {roomState.members.map((member) => {
                   const isHost = member.id === roomState.hostId;
                   const isMe = member.id === myMemberId;
@@ -466,25 +469,24 @@ function App() {
                   return (
                     <div 
                       key={member.id}
-                      className={`p-4 rounded-2xl border transition-all flex flex-col gap-1 relative overflow-hidden ${
+                      className={`p-3.5 rounded-lg border transition-colors flex flex-col gap-1 relative overflow-hidden ${
                         isMe 
-                          ? 'bg-rose-50/70 border-rose-200/50 shadow-sm shadow-rose-100' 
-                          : 'bg-white border-slate-200/70'
+                          ? 'bg-orange-50 border-orange-200' 
+                          : 'bg-white border-zinc-200'
                       }`}
                     >
-                      {/* Host Tag */}
                       {isHost && (
-                        <span className="absolute top-0 right-0 bg-orange-500 text-white text-[9px] font-black px-2 py-0.5 rounded-bl-lg">
+                        <span className="absolute top-0 right-0 bg-orange-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl-lg">
                           방장
                         </span>
                       )}
                       
-                      <span className="text-sm font-bold text-slate-800 block truncate pr-8">
+                      <span className="text-sm font-medium text-zinc-800 block truncate pr-8">
                         {member.nickname} {isMe && "(나)"}
                       </span>
                       
-                      <span className="text-[10px] font-semibold text-slate-400 flex items-center gap-1 mt-1">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                      <span className="text-[10px] text-zinc-400 flex items-center gap-1 mt-0.5">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                         대기 중
                       </span>
                     </div>
@@ -494,26 +496,26 @@ function App() {
             </div>
 
             {/* Action Bar */}
-            <div className="mt-8 pt-6 border-t border-slate-200/80 flex gap-4">
+            <div className="mt-7 pt-5 border-t border-zinc-100 flex gap-3">
               {roomState.hostId === myMemberId ? (
                 <button
                   onClick={handleStartGame}
                   disabled={loading}
-                  className="flex-1 py-4 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-600 hover:to-rose-600 text-white font-bold rounded-2xl shadow-lg shadow-rose-500/25 hover:shadow-rose-600/35 transition-all text-center flex items-center justify-center gap-2 group"
+                  className="flex-1 py-3.5 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-lg transition-colors text-center flex items-center justify-center gap-2 text-sm"
                 >
                   {loading ? (
-                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    <RefreshCw className="w-4 h-4 animate-spin" />
                   ) : (
                     <>
-                      게임 시작하기! (스와이프 작동)
-                      <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                      투표 시작하기
+                      <ArrowRight className="w-4 h-4" />
                     </>
                   )}
                 </button>
               ) : (
-                <div className="flex-1 py-4 bg-slate-100 border border-slate-200 text-slate-500 text-center font-bold rounded-2xl flex items-center justify-center gap-2 animate-pulse text-sm">
-                  <RefreshCw className="w-4 h-4 animate-spin text-slate-400" />
-                  방장이 게임을 시작하기를 기다리는 중...
+                <div className="flex-1 py-3.5 bg-zinc-50 border border-zinc-200 text-zinc-500 text-center font-medium rounded-lg flex items-center justify-center gap-2 text-sm">
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-zinc-400" />
+                  방장이 시작하기를 기다리는 중...
                 </div>
               )}
             </div>
@@ -522,107 +524,105 @@ function App() {
 
         {/* ==================== 3. SWIPE PHASE ==================== */}
         {roomId && roomState && roomState.status === 'PLAYING' && (
-          <div className="w-full max-w-md flex flex-col gap-6 items-center">
+          <div className="w-full max-w-md flex flex-col gap-5 items-center">
             
             {/* Top Info Bar */}
-            <div className="w-full bg-white/80 backdrop-blur-md border border-slate-200/40 rounded-2xl p-4 shadow-md flex items-center justify-between">
+            <div className="w-full bg-white border border-zinc-200 rounded-lg p-4 shadow-sm flex items-center justify-between">
               <div>
-                <span className="text-[10px] font-bold text-rose-500 block uppercase tracking-wider">SWIPING</span>
-                <span className="text-slate-800 text-sm font-black">먹고 싶은 메뉴를 카드로 결정</span>
+                <span className="text-[10px] font-medium text-orange-500 block uppercase tracking-wide">투표 진행 중</span>
+                <span className="text-zinc-800 text-sm font-medium">먹고 싶은 메뉴를 선택하세요</span>
               </div>
-              <div className="bg-rose-100 text-rose-600 px-3 py-1.5 rounded-full text-xs font-extrabold flex items-center gap-1">
-                🔥 {swipeCount} / 15 완료
+              <div className="bg-zinc-100 text-zinc-600 px-3 py-1.5 rounded-lg text-xs font-medium">
+                {swipeCount} / 15
               </div>
             </div>
 
             {/* Real-time Group Progress Bar */}
-            <div className="w-full bg-white/80 backdrop-blur-md border border-slate-200/40 rounded-2xl p-4 shadow-md">
+            <div className="w-full bg-white border border-zinc-200 rounded-lg p-4 shadow-sm">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-xs font-bold text-slate-600 flex items-center gap-1">
-                  <Users className="w-3.5 h-3.5 text-slate-400" />
-                  실시간 그룹 투표 참여 현황
+                <span className="text-xs font-medium text-zinc-600 flex items-center gap-1">
+                  <Users className="w-3.5 h-3.5 text-zinc-400" />
+                  그룹 진행률
                 </span>
-                <span className="text-xs font-extrabold text-rose-600">
+                <span className="text-xs font-medium text-orange-600">
                   {roomState.completedMembersCount} / {roomState.totalMembers}명 완료
                 </span>
               </div>
-              <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200/40">
+              <div className="w-full h-2 bg-zinc-100 rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-gradient-to-r from-rose-500 to-orange-400 transition-all duration-500"
+                  className="h-full bg-orange-500 transition-all duration-500 rounded-full"
                   style={{ width: `${(roomState.completedMembersCount / roomState.totalMembers) * 100}%` }}
                 />
               </div>
-              <p className="text-[10px] text-slate-400 mt-2 text-center">전원이 15장의 카드를 모두 스와이프하면 자동으로 매칭 결과 창이 열립니다.</p>
+              <p className="text-[10px] text-zinc-400 mt-2 text-center">전원 완료 시 자동으로 결과가 표시됩니다.</p>
             </div>
 
             {/* Tinder Cards Stack Container */}
             <div className="relative w-full h-[400px] flex justify-center items-center">
               {swipeCount >= 15 ? (
-                /* ALL SWIPED LOCAL WAITING BOARD */
-                <div className="w-full h-full bg-white/80 backdrop-blur-xl border border-white/60 shadow-xl rounded-3xl p-8 flex flex-col justify-center items-center text-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-500 shadow-md">
-                    <CheckCircle2 className="w-8 h-8" />
+                /* ALL SWIPED LOCAL WAITING */
+                <div className="w-full h-full bg-white border border-zinc-200 shadow-sm rounded-xl p-8 flex flex-col justify-center items-center text-center gap-4">
+                  <div className="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500">
+                    <CheckCircle2 className="w-7 h-7" />
                   </div>
-                  <h3 className="text-xl font-black text-slate-800 mt-2">나의 투표 완료!</h3>
-                  <p className="text-slate-500 text-sm max-w-xs leading-relaxed">
-                    다른 친구들이 투표를 완료할 때까지 대기하고 있습니다. 실시간으로 화면이 자동 갱신됩니다.
+                  <h3 className="text-lg font-bold text-zinc-800 mt-1">투표 완료</h3>
+                  <p className="text-zinc-500 text-sm max-w-xs leading-relaxed">
+                    다른 참여자들의 투표가 끝나면 결과가 자동으로 표시됩니다.
                   </p>
-                  <div className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-full text-xs font-bold mt-2 shadow-sm animate-pulse">
+                  <div className="flex items-center gap-2 bg-zinc-800 text-white px-4 py-2 rounded-lg text-xs font-medium mt-1">
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    친구들 대기중 ({roomState.completedMembersCount} / {roomState.totalMembers}명 완료)
+                    대기 중 ({roomState.completedMembersCount} / {roomState.totalMembers}명)
                   </div>
                 </div>
               ) : (
-                /* TINDER CARDS DECK */
-                roomState.defaultMenus.map((menu, index) => {
-                  // 이미 사용자가 스와이프한 인덱스는 숨김
-                  if (index < swipeCount) return null;
-
-                  const meta = MENU_METADATA[menu] || { emoji: "🍴", category: "음식", description: "맛있는 음식 카드를 밀어주세요!", gradient: "from-rose-500 to-orange-500" };
+                /* TINDER CARDS DECK - 역순 렌더링으로 현재 카드가 DOM 최상단(z-index 최고) */
+                [...roomState.defaultMenus.slice(swipeCount)].reverse().map((menu, reversedIdx, arr) => {
+                  const originalIndex = swipeCount + (arr.length - 1 - reversedIdx);
+                  const meta = MENU_METADATA[menu] || { emoji: "🍴", category: "음식", description: "맛있는 음식 카드를 밀어주세요!", gradient: "from-orange-500 to-amber-500" };
 
                   return (
                     <TinderCard
                       className="absolute w-full h-full cursor-grab active:cursor-grabbing"
-                      key={menu}
+                      key={`${menu}-${originalIndex}`}
                       onSwipe={(dir) => handleCardSwipe(dir, menu)}
+                      onCardLeftScreen={() => handleCardLeftScreen(menu)}
                       preventSwipe={['up', 'down']}
                     >
-                      <div className={`w-full h-full bg-gradient-to-br ${meta.gradient} rounded-3xl p-8 shadow-2xl flex flex-col justify-between text-white relative overflow-hidden`}>
-                        {/* Background Overlay */}
+                      <div className={`w-full h-full bg-gradient-to-br ${meta.gradient} rounded-xl p-7 shadow flex flex-col justify-between text-white relative overflow-hidden`}>
+                        {/* Subtle overlay */}
                         <div className="absolute inset-0 bg-black/10 pointer-events-none" />
-                        <div className="absolute top-[-30%] right-[-30%] w-[80%] h-[80%] rounded-full bg-white/10 blur-[80px] pointer-events-none" />
 
                         {/* Top Category Badge */}
                         <div className="z-10 flex justify-between items-center">
-                          <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold border border-white/10 tracking-wide">
+                          <span className="bg-white/20 px-3 py-1 rounded-lg text-xs font-medium border border-white/10">
                             {meta.category}
                           </span>
-                          <span className="text-white/40 text-xs font-black tracking-widest font-mono">
-                            {index + 1} / 15
+                          <span className="text-white/50 text-xs font-mono">
+                            {originalIndex + 1} / 15
                           </span>
                         </div>
 
                         {/* Middle Emoji & Name */}
-                        <div className="z-10 text-center my-6 flex flex-col items-center gap-4">
-                          <span className="text-7xl block animate-bounce" style={{ animationDuration: '3s' }}>
+                        <div className="z-10 text-center my-6 flex flex-col items-center gap-3">
+                          <span className="text-5xl block">
                             {meta.emoji}
                           </span>
-                          <h3 className="text-4xl font-black tracking-tight drop-shadow-md">
+                          <h3 className="text-3xl font-bold drop-shadow-sm">
                             {menu}
                           </h3>
                         </div>
 
                         {/* Bottom Description */}
-                        <div className="z-10 bg-white/10 backdrop-blur-md border border-white/10 p-4 rounded-2xl">
-                          <p className="text-xs leading-relaxed text-white/90 font-medium">
+                        <div className="z-10 bg-white/10 border border-white/10 p-4 rounded-lg">
+                          <p className="text-xs leading-relaxed text-white/90">
                             {meta.description}
                           </p>
                         </div>
 
                         {/* Swipe Direction Helper */}
-                        <div className="z-10 flex justify-between items-center mt-2 px-2 text-[10px] font-bold text-white/60">
-                          <span>👈 싫어요 (Left)</span>
-                          <span>좋아요 (Right) 👉</span>
+                        <div className="z-10 flex justify-between items-center mt-2 px-1 text-[10px] font-medium text-white/50">
+                          <span>← 싫어요</span>
+                          <span>좋아요 →</span>
                         </div>
                       </div>
                     </TinderCard>
@@ -635,95 +635,149 @@ function App() {
 
         {/* ==================== 4. RESULT PHASE ==================== */}
         {roomId && roomState && roomState.status === 'COMPLETED' && (
-          <div className="w-full max-w-4xl grid md:grid-cols-12 gap-8 items-start">
+          <div className="w-full max-w-4xl grid md:grid-cols-12 gap-6 items-start">
             
-            {/* Left Col: Menu Matching Banner */}
-            <div className="md:col-span-5 bg-white/80 backdrop-blur-xl border border-white/60 shadow-2xl rounded-3xl p-8 text-center flex flex-col items-center gap-6 relative overflow-hidden">
-              <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-rose-500 via-orange-500 to-amber-500" />
+            {/* Left Col: Winner Card */}
+            <div className="md:col-span-5 bg-white border border-zinc-200 shadow-sm rounded-xl p-7 text-center flex flex-col items-center gap-5 relative overflow-hidden">
+              <div className="absolute top-0 inset-x-0 h-1 bg-orange-500" />
               
-              <div className="inline-flex items-center gap-1 bg-amber-100 text-amber-600 text-xs font-black px-3 py-1 rounded-full border border-amber-200/50 shadow-sm shadow-amber-100/50">
-                <Sparkles className="w-3.5 h-3.5" /> 최종 매칭 성공
+              <div className="inline-flex items-center gap-1 bg-orange-50 text-orange-600 text-xs font-medium px-3 py-1 rounded-lg border border-orange-100">
+                <Sparkles className="w-3.5 h-3.5" /> 매칭 완료
               </div>
 
               <div>
-                <span className="text-slate-400 text-xs block font-bold">우리 파티가 픽한 1위 메뉴는?</span>
-                <span className="text-8xl block mt-4 animate-bounce" style={{ animationDuration: '4s' }}>
+                <span className="text-zinc-400 text-xs block">모두가 선택한 메뉴</span>
+                <span className="text-6xl block mt-3">
                   {MENU_METADATA[roomState.winningMenu || ""]?.emoji || "🍴"}
                 </span>
-                <h2 className="text-4xl sm:text-5xl font-black text-slate-800 tracking-tight mt-4 drop-shadow-sm bg-gradient-to-r from-rose-600 to-amber-500 bg-clip-text text-transparent">
+                <h2 className="text-3xl font-bold text-zinc-800 mt-3">
                   {roomState.winningMenu}
                 </h2>
               </div>
 
-              <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl w-full text-left text-xs text-slate-500 leading-relaxed font-semibold flex items-start gap-2">
-                <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                <span>
-                  모든 투표 기록을 F-401(점수) 및 F-402(거부권), F-403(구제책) 필터링 매칭 알고리즘으로 분석하여 도출된 타협 메뉴입니다.
-                </span>
-              </div>
+              {/* Vote Stats */}
+              {roomState.voteStats && roomState.voteStats.length > 0 && (
+                <div className="w-full">
+                  <p className="text-xs font-semibold text-zinc-500 mb-2.5 flex items-center gap-1.5">
+                    <span>📊</span> 메뉴별 투표 결과
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {[...roomState.voteStats]
+                      .sort((a, b) => (b.likes + b.dislikes) - (a.likes + a.dislikes))
+                      .slice(0, 5)
+                      .map((stat) => {
+                        const total = stat.likes + stat.dislikes;
+                        const maxTotal = Math.max(...roomState.voteStats!.map(s => s.likes + s.dislikes));
+                        const barWidth = maxTotal > 0 ? (total / maxTotal) * 100 : 0;
+                        const isWinner = stat.menuName === roomState.winningMenu;
+                        return (
+                          <div key={stat.menuName} className="flex items-center gap-2">
+                            <span className="text-xs text-zinc-600 w-14 text-right shrink-0 truncate" title={stat.menuName}>
+                              {MENU_METADATA[stat.menuName]?.emoji || '🍴'} {stat.menuName}
+                            </span>
+                            <div className="flex-1 bg-zinc-100 rounded-full h-2 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-700 ${isWinner ? 'bg-orange-500' : 'bg-zinc-300'}`}
+                                style={{ width: `${barWidth}%` }}
+                              />
+                            </div>
+                            <span className="text-[10px] text-zinc-400 shrink-0 flex items-center gap-1">
+                              <span className="text-green-500 font-bold">❤️{stat.likes}</span>
+                              <span className="text-red-400 font-bold">👎{stat.dislikes}</span>
+                            </span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
 
               <button
                 onClick={resetSession}
-                className="w-full py-3.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-sm transition-all shadow-md flex items-center justify-center gap-2"
+                className="w-full py-3 bg-zinc-800 hover:bg-zinc-900 text-white font-medium rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
               >
-                새로운 투표 시작하기
+                새로운 투표 시작
               </button>
             </div>
 
-            {/* Right Col: Restaurant recommendations dashboard with mock map */}
-            <div className="md:col-span-7 flex flex-col gap-6">
+            {/* Right Col: Restaurants */}
+            <div className="md:col-span-7 flex flex-col gap-5">
               
-              {/* Real Kakao Map Component with Auto Mock Fallback */}
               <KakaoMap 
                 matchedRestaurants={roomState.matchedRestaurants} 
                 location={roomState.location} 
               />
 
-              {/* Restaurant List Feed */}
-              <div className="flex flex-col gap-3">
-                <h3 className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
-                  <Compass className="w-4 h-4 text-rose-500" />
-                  추천 연동 주변 5대 맛집 목록
+              {/* Restaurant List */}
+              <div className="flex flex-col gap-2.5">
+                <h3 className="text-sm font-medium text-zinc-700 flex items-center gap-1.5">
+                  <Compass className="w-4 h-4 text-orange-500" />
+                  주변 추천 맛집
                 </h3>
                 
-                {roomState.matchedRestaurants.map((restaurant, index) => (
+                {roomState.matchedRestaurants.length === 0 ? (
+                  <div className="bg-white border border-zinc-200 rounded-lg p-6 text-center shadow-sm flex flex-col items-center justify-center gap-3">
+                    <AlertCircle className="w-8 h-8 text-zinc-400" />
+                    <div>
+                      <p className="text-sm font-semibold text-zinc-700">해당 위치 주변에 추천할 만한 맛집을 찾지 못했어요.</p>
+                      <p className="text-xs text-zinc-500 mt-1">위치를 조금 더 구체적으로 변경해서 방을 다시 만들어보세요.</p>
+                    </div>
+                  </div>
+                ) : (
+                  roomState.matchedRestaurants.map((restaurant, index) => (
                   <div 
                     key={restaurant.id}
-                    className="bg-white border border-slate-200/70 hover:border-rose-300 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all flex items-center gap-4 relative overflow-hidden group"
+                    className="bg-white border border-zinc-200 hover:border-orange-300 rounded-lg p-4 shadow-sm hover:shadow transition-all flex items-center gap-4 group"
                   >
-                    {/* Index Circle */}
-                    <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 font-extrabold text-sm flex items-center justify-center shrink-0 border border-rose-200/30">
+                    {/* Index */}
+                    <div className="w-9 h-9 rounded-lg bg-orange-50 text-orange-600 font-bold text-sm flex items-center justify-center shrink-0 border border-orange-100">
                       {index + 1}
                     </div>
 
                     {/* Restaurant Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-slate-800 truncate text-sm sm:text-base group-hover:text-rose-600 transition-colors">
+                        <h4 className="font-medium text-zinc-800 truncate text-sm group-hover:text-orange-600 transition-colors">
                           {restaurant.name}
                         </h4>
-                        <span className="bg-amber-50 text-amber-600 text-[10px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">
-                          <Star className="w-3 h-3 fill-amber-500 text-amber-500" /> 4.8
-                        </span>
+                        {restaurant.category && (
+                          <span className="bg-orange-50 text-orange-600 text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 border border-orange-100">
+                            {restaurant.category}
+                          </span>
+                        )}
                       </div>
                       
-                      <span className="text-slate-500 text-xs mt-1 block truncate">
-                        📍 {restaurant.address}
+                      <span className="text-zinc-400 text-xs mt-1 block truncate flex items-center gap-1">
+                        <MapPin className="w-3 h-3 shrink-0" />
+                        {restaurant.address}
                       </span>
                     </div>
 
-                    {/* Contact Button */}
-                    {restaurant.phone && (
-                      <a 
-                        href={`tel:${restaurant.phone}`}
-                        className="w-10 h-10 rounded-xl bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200/60 hover:border-rose-200 flex items-center justify-center transition-all shrink-0 shadow-sm"
-                        title={`전화문의: ${restaurant.phone}`}
-                      >
-                        <Phone className="w-4 h-4" />
-                      </a>
-                    )}
+                    {/* Actions */}
+                    <div className="flex gap-1.5 shrink-0">
+                      {restaurant.placeUrl && (
+                        <a
+                          href={restaurant.placeUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-9 h-9 rounded-lg bg-zinc-50 hover:bg-orange-50 text-zinc-400 hover:text-orange-500 border border-zinc-200 hover:border-orange-200 flex items-center justify-center transition-colors"
+                          title="카카오맵에서 보기"
+                        >
+                          <MapPin className="w-4 h-4" />
+                        </a>
+                      )}
+                      {restaurant.phone && (
+                        <a 
+                          href={`tel:${restaurant.phone}`}
+                          className="w-9 h-9 rounded-lg bg-zinc-50 hover:bg-orange-50 text-zinc-400 hover:text-orange-500 border border-zinc-200 hover:border-orange-200 flex items-center justify-center transition-colors shrink-0"
+                          title={`전화: ${restaurant.phone}`}
+                        >
+                          <Phone className="w-4 h-4" />
+                        </a>
+                      )}
+                    </div>
                   </div>
-                ))}
+                )))}
               </div>
             </div>
           </div>
@@ -732,8 +786,8 @@ function App() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full text-center py-5 text-xs text-slate-500 font-medium border-t border-slate-200/40 bg-white/20 backdrop-blur-sm z-10">
-        © 2026 오늘 뭐 먹지? Project. Built with ⚡ Java Spring Boot & React.
+      <footer className="w-full text-center py-5 text-xs text-zinc-400 border-t border-zinc-100">
+        © 2026 오늘 뭐 먹지?
       </footer>
     </div>
   );

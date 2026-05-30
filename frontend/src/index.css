@@ -2,9 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 모바일 모달 및 스와이프 카드를 위한 커스텀 스무스 애니메이션 */
-@layer utilities {
-  .swipe-transition {
-    transition: transform 0.3s ease, opacity 0.3s ease;
-  }
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

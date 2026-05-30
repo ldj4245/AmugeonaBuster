@@ -24,6 +24,15 @@ public class WebSocketRoomResponse {
     private final List<String> defaultMenus;
     private final int totalMembers;
     private final int completedMembersCount;
+    private final List<MenuVoteStat> voteStats;
+
+    @Getter
+    @Builder
+    public static class MenuVoteStat {
+        private final String menuName;
+        private final long likes;
+        private final long dislikes;
+    }
 
     /**
      * 도메인 객체로부터 웹소켓 응답 포맷으로 고속 변환
@@ -58,6 +67,25 @@ public class WebSocketRoomResponse {
                 })
                 .count();
 
+        // 메뉴별 투표 통계 집계 (좋아요/싫어요) — broadcastRoomState 시점에 room이 in-memory swipes를 보유하고 있으므로 정확히 집계됨
+        List<MenuVoteStat> voteStats = DefaultMenus.MENUS.stream()
+                .map(menu -> {
+                    long likes = room.getSwipes().stream()
+                            .filter(s -> s.getMenuName().equals(menu) && s.isLike())
+                            .count();
+                    long dislikes = room.getSwipes().stream()
+                            .filter(s -> s.getMenuName().equals(menu) && !s.isLike())
+                            .count();
+                    return MenuVoteStat.builder()
+                            .menuName(menu)
+                            .likes(likes)
+                            .dislikes(dislikes)
+                            .build();
+                })
+                .filter(stat -> stat.getLikes() > 0 || stat.getDislikes() > 0)
+                .sorted((a, b) -> Long.compare(b.getLikes(), a.getLikes()))
+                .collect(Collectors.toList());
+
         return WebSocketRoomResponse.builder()
                 .roomId(room.getId())
                 .hostId(room.getHostId())
@@ -69,6 +97,7 @@ public class WebSocketRoomResponse {
                 .defaultMenus(DefaultMenus.MENUS)
                 .totalMembers(room.getMembers().size())
                 .completedMembersCount((int) completedCount)
+                .voteStats(voteStats)
                 .build();
     }
 }

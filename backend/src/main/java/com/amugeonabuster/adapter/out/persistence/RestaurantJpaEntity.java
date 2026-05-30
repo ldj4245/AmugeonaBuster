@@ -31,18 +31,26 @@ public class RestaurantJpaEntity {
 
     private String phone;
 
+    @Column(length = 100)
+    private String category;
+
+    @Column(length = 500)
+    private String placeUrl;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "room_id")
     private RoomJpaEntity room;
 
     @Builder
-    public RestaurantJpaEntity(UUID id, String name, String address, double latitude, double longitude, String phone) {
+    public RestaurantJpaEntity(UUID id, String name, String address, double latitude, double longitude, String phone, String category, String placeUrl) {
         this.id = id != null ? id : UUID.randomUUID();
         this.name = name;
         this.address = address;
         this.latitude = latitude;
         this.longitude = longitude;
         this.phone = phone;
+        this.category = category != null ? category : "";
+        this.placeUrl = placeUrl != null ? placeUrl : "";
     }
 
     /**
