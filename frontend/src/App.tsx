@@ -146,6 +146,7 @@ function App() {
   const [menuDetailError, setMenuDetailError] = useState<string | null>(null);
   const [menuDetailCotNo, setMenuDetailCotNo] = useState('');
   const [menuDetailHallNo, setMenuDetailHallNo] = useState('');
+  const [menuMealFilter, setMenuMealFilter] = useState<'all' | 'breakfast' | 'lunch' | 'dinner'>('all');
 
   // 🎮 커피빵 내기 미니게임 관련 상태 변수
   const [isCoffeeGameOpen, setIsCoffeeGameOpen] = useState(false);
@@ -248,6 +249,7 @@ function App() {
 
   // 실시간 식단 상세 조회 API 핸들러
   const triggerFetchMenuDetails = async (cotNo: string, hallNo: string, name: string) => {
+    setMenuMealFilter('all');
     setMenuDetailLoading(true);
     setMenuDetailError(null);
     setIsMenuDetailOpen(true);
@@ -2008,6 +2010,35 @@ function App() {
               </p>
             </div>
 
+            {/* 시간대별 4단 식단 필터 탭 바 (아침 / 점심 / 저녁 / 전체보기) */}
+            {!menuDetailLoading && !menuDetailError && menuDetailCourses.length > 0 && (
+              <div className="bg-white border-b border-zinc-200/80 px-6 py-3.5 shrink-0 flex items-center justify-between gap-4">
+                <span className="text-xs font-black text-zinc-700 tracking-tight">
+                  🕒 오늘 제공 식단 필터
+                </span>
+                <div className="flex bg-zinc-100/80 p-1 rounded-xl border border-zinc-200/30 gap-1 shrink-0 shadow-inner">
+                  {[
+                    { key: 'all', label: '전체보기' },
+                    { key: 'breakfast', label: '아침 ☀️' },
+                    { key: 'lunch', label: '점심 🌤️' },
+                    { key: 'dinner', label: '저녁 🌙' }
+                  ].map((tab) => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setMenuMealFilter(tab.key as any)}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                        menuMealFilter === tab.key
+                          ? 'bg-white text-orange-600 shadow-sm border border-zinc-200/50 scale-[1.02]'
+                          : 'text-zinc-500 hover:text-zinc-700'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* 2. 실시간 식단 데이터 영역 */}
                 {/* 2. 로딩 상태 */}
                 {menuDetailLoading && (
@@ -2077,106 +2108,140 @@ function App() {
                 )}
 
                 {/* 5. 정상 식단 목록 (스크롤) */}
-                {!menuDetailLoading && !menuDetailError && menuDetailCourses.length > 0 && (
-                  <div className="overflow-y-auto p-5 sm:p-8 flex-grow bg-slate-50/50">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {menuDetailCourses.map((course: any, idx: number) => {
-                        const { badgeGradient, courseEmoji } = getCourseStyle(course.courseName);
-                        
-                        const dishes = course.menuDetails
-                          ? course.menuDetails.split(',').map((d: string) => d.trim()).filter((d: string) => d.length > 0)
-                          : [];
-                        
-                        const mainDish = dishes[0] || '식단 준비 중';
-                        const sideDishes = dishes.slice(1);
-                        
-                        const caloriePercentage = Math.min(100, Math.max(10, (course.calories / 1200) * 100));
-                        const calorieColorClass = course.calories < 600 
-                          ? 'bg-emerald-500' 
-                          : course.calories < 850 
-                            ? 'bg-orange-500' 
-                            : 'bg-rose-500';
+                {!menuDetailLoading && !menuDetailError && menuDetailCourses.length > 0 && (() => {
+                  // 식단 시간대 판별 헬퍼
+                  const filteredCourses = menuDetailCourses.filter((course: any) => {
+                    const name = (course.courseName || '').toLowerCase();
+                    const isBreakfast = name.includes('조식') || name.includes('아침') || name.includes('breakfast');
+                    const isDinner = name.includes('석식') || name.includes('저녁') || name.includes('dinner');
+                    // 아침이나 저녁에 해당되지 않으면 점심으로 기본 분류
+                    const isLunch = name.includes('중식') || name.includes('점심') || name.includes('lunch') || (!isBreakfast && !isDinner);
+                    
+                    if (menuMealFilter === 'breakfast') return isBreakfast;
+                    if (menuMealFilter === 'dinner') return isDinner;
+                    if (menuMealFilter === 'lunch') return isLunch;
+                    return true; // 'all'
+                  });
 
-                        return (
-                          <div 
-                            key={idx} 
-                            className="relative bg-white border border-zinc-200 hover:border-orange-300 rounded-3xl p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between gap-5 overflow-hidden group"
-                          >
-                            <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${badgeGradient}`} />
+                  if (filteredCourses.length === 0) {
+                    return (
+                      <div className="flex flex-col items-center justify-center py-28 px-6 gap-5 text-center flex-grow bg-slate-50/50">
+                        <div className="w-16 h-16 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-400 border border-zinc-200/50 text-2xl shadow-xs">
+                          {menuMealFilter === 'breakfast' ? '☀️' : menuMealFilter === 'dinner' ? '🌙' : '🌤️'}
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <h4 className="font-bold text-zinc-800 text-base">
+                            오늘 준비된 {menuMealFilter === 'breakfast' ? '아침' : menuMealFilter === 'dinner' ? '저녁' : '점심'} 식단이 없습니다
+                          </h4>
+                          <p className="text-xs text-zinc-500 max-w-xs leading-relaxed mx-auto">
+                            해당 시간대에는 식사를 운영하지 않거나 식단 정보가 등록되지 않았습니다. 전체보기를 통해 다른 시간대의 식단을 확인해 보세요!
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  }
 
-                            <div className="flex flex-col gap-4">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className={`text-xs font-black tracking-tight text-white bg-gradient-to-r ${badgeGradient} px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm`}>
-                                  <span>{courseEmoji}</span>
-                                  {course.courseName}
-                                </span>
-                                {course.price && (
-                                  <span className="text-xs font-bold text-zinc-600 bg-zinc-100/80 border border-zinc-200/40 px-3 py-1.5 rounded-xl font-mono shadow-xs">
-                                    💰 {course.price}
+                  return (
+                    <div className="overflow-y-auto p-5 sm:p-8 flex-grow bg-slate-50/50">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {filteredCourses.map((course: any, idx: number) => {
+                          const { badgeGradient, courseEmoji } = getCourseStyle(course.courseName);
+                          
+                          const dishes = course.menuDetails
+                            ? course.menuDetails.split(',').map((d: string) => d.trim()).filter((d: string) => d.length > 0)
+                            : [];
+                          
+                          const mainDish = dishes[0] || '식단 준비 중';
+                          const sideDishes = dishes.slice(1);
+                          
+                          const caloriePercentage = Math.min(100, Math.max(10, (course.calories / 1200) * 100));
+                          const calorieColorClass = course.calories < 600 
+                            ? 'bg-emerald-500' 
+                            : course.calories < 850 
+                              ? 'bg-orange-500' 
+                              : 'bg-rose-500';
+
+                          return (
+                            <div 
+                              key={idx} 
+                              className="relative bg-white border border-zinc-200 hover:border-orange-300 rounded-3xl p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between gap-5 overflow-hidden group"
+                            >
+                              <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${badgeGradient}`} />
+
+                              <div className="flex flex-col gap-4">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className={`text-xs font-black tracking-tight text-white bg-gradient-to-r ${badgeGradient} px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm`}>
+                                    <span>{courseEmoji}</span>
+                                    {course.courseName}
                                   </span>
-                                )}
-                              </div>
-
-                              <div className="relative w-full h-44 rounded-2xl overflow-hidden bg-zinc-100 shadow-inner border border-zinc-100">
-                                <img 
-                                  src={getCourseImage(course.courseName, course.imageUrl)} 
-                                  alt={course.courseName} 
-                                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                                  onError={(e) => {
-                                    e.currentTarget.src = getCourseImage(course.courseName);
-                                  }}
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent pointer-events-none" />
-                              </div>
-
-                              <div className="flex flex-col gap-3.5">
-                                <div className="bg-orange-50/50 border border-orange-100/50 p-3.5 rounded-2xl">
-                                  <span className="text-[9px] font-black text-orange-500 bg-orange-100/60 px-2 py-0.5 rounded-md uppercase tracking-wider block w-fit mb-1.5">
-                                    👑 오늘의 메인 요리
-                                  </span>
-                                  <h4 className="text-sm font-black text-zinc-800 leading-snug">
-                                    {mainDish}
-                                  </h4>
-                                </div>
-
-                                {sideDishes.length > 0 && (
-                                  <div className="flex flex-col gap-2 px-1">
-                                    <span className="text-[10px] font-extrabold text-zinc-400 uppercase tracking-wider block mb-1">
-                                      🥗 함께 제공되는 찬류 및 사이드
+                                  {course.price && (
+                                    <span className="text-xs font-bold text-zinc-600 bg-zinc-100/80 border border-zinc-200/40 px-3 py-1.5 rounded-xl font-mono shadow-xs">
+                                      💰 {course.price}
                                     </span>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
-                                      {sideDishes.map((side: string, sIdx: number) => (
-                                        <div key={sIdx} className="flex items-center gap-2 text-xs font-bold text-zinc-600">
-                                          <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0 shadow-xs" />
-                                          <span className="truncate" title={side}>{side}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
+                                  )}
+                                </div>
 
-                            {course.calories > 0 && (
-                              <div className="border-t border-zinc-100 pt-4 flex flex-col gap-1.5">
-                                <div className="flex items-center justify-between text-[11px] font-black text-zinc-400">
-                                  <span className="flex items-center gap-1">🔥 총 칼로리</span>
-                                  <span className="font-mono text-zinc-700 text-xs font-bold">{course.calories} kcal</span>
-                                </div>
-                                <div className="w-full h-2.5 bg-zinc-100 rounded-full overflow-hidden shadow-inner relative">
-                                  <div 
-                                    className={`h-full rounded-full transition-all duration-500 ${calorieColorClass}`} 
-                                    style={{ width: `${caloriePercentage}%` }}
+                                <div className="relative w-full h-44 rounded-2xl overflow-hidden bg-zinc-100 shadow-inner border border-zinc-100">
+                                  <img 
+                                    src={getCourseImage(course.courseName, course.imageUrl)} 
+                                    alt={course.courseName} 
+                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                                    onError={(e) => {
+                                      e.currentTarget.src = getCourseImage(course.courseName);
+                                    }}
                                   />
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent pointer-events-none" />
+                                </div>
+
+                                <div className="flex flex-col gap-3.5">
+                                  <div className="bg-orange-50/50 border border-orange-100/50 p-3.5 rounded-2xl">
+                                    <span className="text-[9px] font-black text-orange-500 bg-orange-100/60 px-2 py-0.5 rounded-md uppercase tracking-wider block w-fit mb-1.5">
+                                      👑 오늘의 메인 요리
+                                    </span>
+                                    <h4 className="text-sm font-black text-zinc-800 leading-snug">
+                                      {mainDish}
+                                    </h4>
+                                  </div>
+
+                                  {sideDishes.length > 0 && (
+                                    <div className="flex flex-col gap-2 px-1">
+                                      <span className="text-[10px] font-extrabold text-zinc-400 uppercase tracking-wider block mb-1">
+                                        🥗 함께 제공되는 찬류 및 사이드
+                                      </span>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                                        {sideDishes.map((side: string, sIdx: number) => (
+                                          <div key={sIdx} className="flex items-center gap-2 text-xs font-bold text-zinc-600">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0 shadow-xs" />
+                                            <span className="truncate" title={side}>{side}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
-                            )}
-                          </div>
-                        );
-                      })}
+
+                              {course.calories > 0 && (
+                                <div className="border-t border-zinc-100 pt-4 flex flex-col gap-1.5">
+                                  <div className="flex items-center justify-between text-[11px] font-black text-zinc-400">
+                                    <span className="flex items-center gap-1">🔥 총 칼로리</span>
+                                    <span className="font-mono text-zinc-700 text-xs font-bold">{course.calories} kcal</span>
+                                  </div>
+                                  <div className="w-full h-2.5 bg-zinc-100 rounded-full overflow-hidden shadow-inner relative">
+                                    <div 
+                                      className={`h-full rounded-full transition-all duration-500 ${calorieColorClass}`} 
+                                      style={{ width: `${caloriePercentage}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
             {/* 6. 모달 하단 퀵 액션 */}
             <div className="bg-zinc-50/80 border-t border-zinc-200 p-4 shrink-0 flex items-center justify-between gap-4 text-xs font-bold text-zinc-500 sm:px-6">
