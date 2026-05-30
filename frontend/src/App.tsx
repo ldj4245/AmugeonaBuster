@@ -212,9 +212,8 @@ function App() {
   // 클립보드에 초대 코드 복사 함수
   const copyInviteLink = () => {
     if (!roomId) return;
-    const inviteUrl = `${window.location.origin}?room=${roomId}`;
-    navigator.clipboard.writeText(inviteUrl);
-    alert('🔗 초대 링크가 클립보드에 성공적으로 복사되었습니다! 친구들에게 공유해 보세요.');
+    navigator.clipboard.writeText(roomId);
+    alert('🔗 초대 코드가 클립보드에 성공적으로 복사되었습니다! 친구들에게 공유해 보세요.');
   };
 
   // 로컬 세션 리셋하고 처음으로 돌아가기
