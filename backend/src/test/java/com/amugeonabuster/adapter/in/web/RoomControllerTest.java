@@ -1,11 +1,14 @@
 package com.amugeonabuster.adapter.in.web;
 
-import com.amugeonabuster.adapter.in.web.dto.CreateRoomRequest;
-import com.amugeonabuster.adapter.in.web.dto.JoinRoomRequest;
+import com.amugeonabuster.adapter.in.web.dto.*;
 import com.amugeonabuster.application.port.in.CreateRoomUseCase;
 import com.amugeonabuster.application.port.in.CreateRoomUseCase.CreateRoomCommand;
 import com.amugeonabuster.application.port.in.JoinRoomUseCase;
 import com.amugeonabuster.application.port.in.JoinRoomUseCase.JoinRoomCommand;
+import com.amugeonabuster.application.port.in.StartVotingUseCase;
+import com.amugeonabuster.application.port.in.StartVotingUseCase.StartVotingCommand;
+import com.amugeonabuster.application.port.in.SwipeMenuUseCase;
+import com.amugeonabuster.application.port.in.SwipeMenuUseCase.SwipeMenuCommand;
 import com.amugeonabuster.domain.model.Member;
 import com.amugeonabuster.domain.model.Room;
 import com.amugeonabuster.domain.model.RoomStatus;
@@ -40,6 +43,12 @@ class RoomControllerTest {
 
     @MockBean
     private JoinRoomUseCase joinRoomUseCase;
+
+    @MockBean
+    private StartVotingUseCase startVotingUseCase;
+
+    @MockBean
+    private SwipeMenuUseCase swipeMenuUseCase;
 
     @Test
     @DisplayName("방 개설 API 호출 시 HTTP 201 상태코드와 생성된 방 데이터를 JSON으로 응답받는다")
@@ -101,5 +110,65 @@ class RoomControllerTest {
                 .andExpect(jsonPath("$.members").isArray())
                 .andExpect(jsonPath("$.members[1].nickname").value("이참가"))
                 .andExpect(jsonPath("$.members[1].ready").value(false));
+    }
+
+    @Test
+    @DisplayName("방장의 투표 시작 API 호출 시 HTTP 200 상태코드와 PLAYING으로 전환된 방 데이터를 응답받는다")
+    void startVoting_api_success() throws Exception {
+        // given
+        String roomId = "ROOM-ABC123";
+        UUID hostId = UUID.randomUUID();
+        StartVotingRequest request = new StartVotingRequest();
+        request.setHostId(hostId);
+
+        Room room = Room.builder()
+                .id(roomId)
+                .hostId(hostId)
+                .location("강남역")
+                .status(RoomStatus.PLAYING)
+                .build();
+
+        when(startVotingUseCase.startVoting(any(StartVotingCommand.class))).thenReturn(room);
+
+        // when & then
+        mockMvc.perform(post("/api/rooms/{roomId}/start", roomId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roomId").value(roomId))
+                .andExpect(jsonPath("$.status").value("PLAYING"));
+    }
+
+    @Test
+    @DisplayName("메뉴 스와이프 투표 API 호출 시 HTTP 200 상태코드와 투표 정보가 반영된 방 데이터를 응답받는다")
+    void swipeMenu_api_success() throws Exception {
+        // given
+        String roomId = "ROOM-ABC123";
+        UUID memberId = UUID.randomUUID();
+        SwipeMenuRequest request = new SwipeMenuRequest();
+        request.setMemberId(memberId);
+        request.setMenuName("삼겹살");
+        request.setLike(true);
+
+        Room room = Room.builder()
+                .id(roomId)
+                .hostId(memberId)
+                .location("강남역")
+                .status(RoomStatus.LOBBY)
+                .build();
+        room.joinMember(Member.builder().id(memberId).nickname("투표자").isReady(true).build());
+        room.startVoting(memberId);
+        room.swipeMenu(memberId, "삼겹살", true);
+
+        when(swipeMenuUseCase.swipeMenu(any(SwipeMenuCommand.class))).thenReturn(room);
+
+        // when & then
+        mockMvc.perform(post("/api/rooms/{roomId}/swipes", roomId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roomId").value(roomId))
+                .andExpect(jsonPath("$.totalMembers").value(1))
+                .andExpect(jsonPath("$.completedMembersCount").value(0)); // 15개 중 1개만 했으므로 완료수는 0
     }
 }

@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Getter
 public class Room {
@@ -18,16 +19,22 @@ public class Room {
     private final String location;
     private RoomStatus status;
     private final List<Member> members;
+    private final List<Swipe> swipes;
+    private String winningMenu;
+    private final List<Restaurant> matchedRestaurants;
 
     private static final int MAX_MEMBER_SIZE = 10;
 
     @Builder
-    public Room(String id, UUID hostId, String location, RoomStatus status, List<Member> members) {
+    public Room(String id, UUID hostId, String location, RoomStatus status, List<Member> members, List<Swipe> swipes, String winningMenu, List<Restaurant> matchedRestaurants) {
         this.id = id;
         this.hostId = hostId;
         this.location = location;
         this.status = status != null ? status : RoomStatus.LOBBY;
         this.members = members != null ? new ArrayList<>(members) : new ArrayList<>();
+        this.swipes = swipes != null ? new ArrayList<>(swipes) : new ArrayList<>();
+        this.winningMenu = winningMenu;
+        this.matchedRestaurants = matchedRestaurants != null ? new ArrayList<>(matchedRestaurants) : new ArrayList<>();
     }
 
     /**
@@ -35,6 +42,14 @@ public class Room {
      */
     public List<Member> getMembers() {
         return Collections.unmodifiableList(members);
+    }
+
+    public List<Swipe> getSwipes() {
+        return Collections.unmodifiableList(swipes);
+    }
+
+    public List<Restaurant> getMatchedRestaurants() {
+        return Collections.unmodifiableList(matchedRestaurants);
     }
 
     /**
@@ -71,12 +86,150 @@ public class Room {
     }
 
     /**
-     * 최종 투표 완료 및 게임 매칭 완료 룰
+     * 메뉴 스와이프 등록 비즈니스 룰 (멱등성 보장)
      */
-    public void completeVoting() {
+    public void swipeMenu(UUID memberId, String menuName, boolean isLike) {
         if (this.status != RoomStatus.PLAYING) {
-            throw new InvalidRoomStateException("투표 진행 중인 방만 매칭을 완료할 수 있습니다.");
+            throw new InvalidRoomStateException("투표가 진행 중인 방에서만 스와이프할 수 있습니다.");
         }
+
+        // 멤버 존재 검증
+        boolean memberExists = this.members.stream()
+                .anyMatch(m -> m.getId().equals(memberId));
+        if (!memberExists) {
+            throw new IllegalArgumentException("방에 속해있지 않은 멤버의 요청입니다.");
+        }
+
+        // 멱등성 보장: 동일 유저가 동일 메뉴에 이미 투표했는지 체크하여 중복 요청 무시
+        boolean isDuplicated = this.swipes.stream()
+                .anyMatch(s -> s.getMemberId().equals(memberId) && s.getMenuName().equals(menuName));
+
+        if (!isDuplicated) {
+            this.swipes.add(Swipe.builder()
+                    .memberId(memberId)
+                    .menuName(menuName)
+                    .isLike(isLike)
+                    .build());
+        }
+    }
+
+    /**
+     * 모든 참여자가 전체 15개 카드를 모두 스와이프했는지 판별
+     */
+    public boolean isAllMembersCompletedSwiping() {
+        if (this.members.isEmpty()) {
+            return false;
+        }
+
+        int targetMenuCount = DefaultMenus.MENUS.size();
+
+        for (Member m : this.members) {
+            long uniqueSwipedCount = this.swipes.stream()
+                    .filter(s -> s.getMemberId().equals(m.getId()))
+                    .map(Swipe::getMenuName)
+                    .distinct()
+                    .count();
+
+            if (uniqueSwipedCount < targetMenuCount) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 합의점(Consensus) 도출 매칭 알고리즘 가동
+     */
+    public void determineWinningMenu() {
+        if (this.status != RoomStatus.PLAYING) {
+            throw new InvalidRoomStateException("투표 진행 중인 방만 최종 매칭을 완료할 수 있습니다.");
+        }
+
+        List<String> allMenus = DefaultMenus.MENUS;
+        List<MenuScore> scores = new ArrayList<>();
+
+        for (int i = 0; i < allMenus.size(); i++) {
+            String menu = allMenus.get(i);
+            long likes = this.swipes.stream()
+                    .filter(s -> s.getMenuName().equals(menu) && s.isLike())
+                    .count();
+            long dislikes = this.swipes.stream()
+                    .filter(s -> s.getMenuName().equals(menu) && !s.isLike())
+                    .count();
+
+            long regularScore = likes * 1 + dislikes * (-2);
+            double fallbackScore = likes * 1.0 - dislikes * 0.5;
+            boolean isVetoed = dislikes > 0;
+
+            scores.add(new MenuScore(menu, i, likes, dislikes, regularScore, fallbackScore, isVetoed));
+        }
+
+        // F-402 거부권 필터링 시도
+        List<MenuScore> nonVetoedScores = scores.stream()
+                .filter(s -> !s.isVetoed)
+                .collect(Collectors.toList());
+
+        MenuScore winner;
+        if (!nonVetoedScores.isEmpty()) {
+            // 거부권 없는 메뉴가 있는 경우 정규 알고리즘 작동
+            winner = nonVetoedScores.stream()
+                    .max((s1, s2) -> {
+                        if (s1.regularScore != s2.regularScore) {
+                            return Long.compare(s1.regularScore, s2.regularScore);
+                        }
+                        if (s1.likes != s2.likes) {
+                            return Long.compare(s1.likes, s2.likes);
+                        }
+                        // 동점인 경우 기본 인덱스가 더 앞서 있는 것 (인덱스 값이 더 작은 것) 선호
+                        return Integer.compare(s2.defaultIndex, s1.defaultIndex);
+                    })
+                    .orElseThrow();
+        } else {
+            // F-403 비토 폭탄 구제 알고리즘 작동
+            winner = scores.stream()
+                    .max((s1, s2) -> {
+                        if (Double.compare(s1.fallbackScore, s2.fallbackScore) != 0) {
+                            return Double.compare(s1.fallbackScore, s2.fallbackScore);
+                        }
+                        if (s1.likes != s2.likes) {
+                            return Long.compare(s1.likes, s2.likes);
+                        }
+                        return Integer.compare(s2.defaultIndex, s1.defaultIndex);
+                    })
+                    .orElseThrow();
+        }
+
+        this.winningMenu = winner.menuName;
         this.status = RoomStatus.COMPLETED;
+    }
+
+    public void associateMatchedRestaurants(List<Restaurant> restaurants) {
+        this.matchedRestaurants.clear();
+        if (restaurants != null) {
+            this.matchedRestaurants.addAll(restaurants);
+        }
+    }
+
+    /**
+     * 알고리즘 연산을 위한 헬퍼 내부 레코드 구조
+     */
+    private static class MenuScore {
+        final String menuName;
+        final int defaultIndex;
+        final long likes;
+        final long dislikes;
+        final long regularScore;
+        final double fallbackScore;
+        final boolean isVetoed;
+
+        MenuScore(String menuName, int defaultIndex, long likes, long dislikes, long regularScore, double fallbackScore, boolean isVetoed) {
+            this.menuName = menuName;
+            this.defaultIndex = defaultIndex;
+            this.likes = likes;
+            this.dislikes = dislikes;
+            this.regularScore = regularScore;
+            this.fallbackScore = fallbackScore;
+            this.isVetoed = isVetoed;
+        }
     }
 }

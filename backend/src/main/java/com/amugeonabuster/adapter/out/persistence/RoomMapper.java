@@ -1,7 +1,9 @@
 package com.amugeonabuster.adapter.out.persistence;
 
 import com.amugeonabuster.domain.model.Member;
+import com.amugeonabuster.domain.model.Restaurant;
 import com.amugeonabuster.domain.model.Room;
+import com.amugeonabuster.domain.model.Swipe;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -26,12 +28,34 @@ public class RoomMapper {
                         .build())
                 .collect(Collectors.toList());
 
+        List<Swipe> domainSwipes = jpaEntity.getSwipes().stream()
+                .map(swipeEntity -> Swipe.builder()
+                        .memberId(swipeEntity.getMemberId())
+                        .menuName(swipeEntity.getMenuName())
+                        .isLike(swipeEntity.isLike())
+                        .build())
+                .collect(Collectors.toList());
+
+        List<Restaurant> domainRestaurants = jpaEntity.getMatchedRestaurants().stream()
+                .map(restaurantEntity -> Restaurant.builder()
+                        .id(restaurantEntity.getId())
+                        .name(restaurantEntity.getName())
+                        .address(restaurantEntity.getAddress())
+                        .latitude(restaurantEntity.getLatitude())
+                        .longitude(restaurantEntity.getLongitude())
+                        .phone(restaurantEntity.getPhone())
+                        .build())
+                .collect(Collectors.toList());
+
         return Room.builder()
                 .id(jpaEntity.getId())
                 .hostId(jpaEntity.getHostId())
                 .location(jpaEntity.getLocation())
                 .status(jpaEntity.getStatus())
                 .members(domainMembers)
+                .swipes(domainSwipes)
+                .winningMenu(jpaEntity.getWinningMenu())
+                .matchedRestaurants(domainRestaurants)
                 .build();
     }
 
@@ -48,6 +72,7 @@ public class RoomMapper {
                 .hostId(domainModel.getHostId())
                 .location(domainModel.getLocation())
                 .status(domainModel.getStatus())
+                .winningMenu(domainModel.getWinningMenu())
                 .build();
 
         // 도메인 내부에 격리된 멤버들을 양방향 JPA Entity 관계로 바인딩
@@ -58,6 +83,29 @@ public class RoomMapper {
                     .isReady(domainMember.isReady())
                     .build();
             jpaEntity.addMember(memberJpaEntity);
+        });
+
+        // 도메인 내부에 격리된 스와이프들을 양방향 JPA Entity 관계로 바인딩
+        domainModel.getSwipes().forEach(domainSwipe -> {
+            SwipeJpaEntity swipeJpaEntity = SwipeJpaEntity.builder()
+                    .memberId(domainSwipe.getMemberId())
+                    .menuName(domainSwipe.getMenuName())
+                    .isLike(domainSwipe.isLike())
+                    .build();
+            jpaEntity.addSwipe(swipeJpaEntity);
+        });
+
+        // 도메인 내부에 격리된 식당들을 양방향 JPA Entity 관계로 바인딩
+        domainModel.getMatchedRestaurants().forEach(domainRestaurant -> {
+            RestaurantJpaEntity restaurantJpaEntity = RestaurantJpaEntity.builder()
+                    .id(domainRestaurant.getId())
+                    .name(domainRestaurant.getName())
+                    .address(domainRestaurant.getAddress())
+                    .latitude(domainRestaurant.getLatitude())
+                    .longitude(domainRestaurant.getLongitude())
+                    .phone(domainRestaurant.getPhone())
+                    .build();
+            jpaEntity.addRestaurant(restaurantJpaEntity);
         });
 
         return jpaEntity;
