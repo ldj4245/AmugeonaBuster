@@ -2012,11 +2012,11 @@ function App() {
 
             {/* 시간대별 4단 식단 필터 탭 바 (아침 / 점심 / 저녁 / 전체보기) */}
             {!menuDetailLoading && !menuDetailError && menuDetailCourses.length > 0 && (
-              <div className="bg-white border-b border-zinc-200/80 px-6 py-3.5 shrink-0 flex items-center justify-between gap-4">
-                <span className="text-xs font-black text-zinc-700 tracking-tight">
+              <div className="bg-white border-b border-zinc-200/80 px-5 py-3 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 select-none animate-slide-down">
+                <span className="text-xs font-black text-zinc-700 tracking-tight flex items-center gap-1.5 whitespace-nowrap shrink-0">
                   🕒 오늘 제공 식단 필터
                 </span>
-                <div className="flex bg-zinc-100/80 p-1 rounded-xl border border-zinc-200/30 gap-1 shrink-0 shadow-inner">
+                <div className="flex bg-zinc-100/80 p-1 rounded-xl border border-zinc-200/30 gap-1 w-full sm:w-auto justify-between sm:justify-start shadow-inner">
                   {[
                     { key: 'all', label: '전체보기' },
                     { key: 'breakfast', label: '아침 ☀️' },
@@ -2026,7 +2026,7 @@ function App() {
                     <button
                       key={tab.key}
                       onClick={() => setMenuMealFilter(tab.key as any)}
-                      className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                      className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer whitespace-nowrap text-center ${
                         menuMealFilter === tab.key
                           ? 'bg-white text-orange-600 shadow-sm border border-zinc-200/50 scale-[1.02]'
                           : 'text-zinc-500 hover:text-zinc-700'
