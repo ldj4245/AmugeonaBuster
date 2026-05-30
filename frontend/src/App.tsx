@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Flame, Compass, Users, Sparkles, MapPin, ArrowRight, CheckCircle2, RefreshCw, Star, Phone, Info } from 'lucide-react';
 import TinderCard from 'react-tinder-card';
 import { useWebSocket, WebSocketRoomResponse } from './hooks/useWebSocket';
+import { KakaoMap } from './components/KakaoMap';
 
 // 메뉴 카테고리 정보 및 아이콘 정보 매핑
 const MENU_METADATA: Record<string, { emoji: string; category: string; description: string; gradient: string }> = {
@@ -22,7 +23,9 @@ const MENU_METADATA: Record<string, { emoji: string; category: string; descripti
   "팟타이": { emoji: "🍳", category: "아시안 / 볶음면", description: "새콤달콤 소스에 새우와 두부를 볶아낸 태국 대표 요리!", gradient: "from-amber-400 to-emerald-500" }
 };
 
-const BASE_URL = 'http://localhost:8080/api/rooms';
+const BASE_URL = window.location.hostname === 'localhost'
+  ? 'http://localhost:8080/api/rooms'
+  : `${window.location.origin}/api/rooms`;
 
 function App() {
   // 상태 변수 정의
@@ -670,57 +673,11 @@ function App() {
             {/* Right Col: Restaurant recommendations dashboard with mock map */}
             <div className="md:col-span-7 flex flex-col gap-6">
               
-              {/* Mock Map Container */}
-              <div className="w-full bg-white/80 backdrop-blur-xl border border-white/60 shadow-xl rounded-3xl p-6 relative overflow-hidden">
-                <h3 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-1.5">
-                  <Compass className="w-4 h-4 text-rose-500" />
-                  📍 {roomState.location} 맛집 매칭 지도
-                </h3>
-                
-                {/* Simulated Modern Interactive Map */}
-                <div className="w-full h-[220px] bg-slate-100 rounded-2xl border border-slate-200/60 relative overflow-hidden shadow-inner flex items-center justify-center">
-                  {/* Grid Lines Pattern */}
-                  <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:24px_24px] opacity-40" />
-                  
-                  {/* Map Roads Simulation */}
-                  <div className="absolute top-[30%] left-0 w-full h-4 bg-white border-y border-slate-200/50 rotate-[3deg] pointer-events-none" />
-                  <div className="absolute top-[70%] left-0 w-full h-6 bg-white border-y border-slate-200/50 rotate-[-2deg] pointer-events-none" />
-                  <div className="absolute left-[40%] top-0 w-5 h-full bg-white border-x border-slate-200/50 rotate-[12deg] pointer-events-none" />
-
-                  {/* Area Label */}
-                  <div className="absolute top-4 left-4 bg-white/80 border border-slate-200/50 px-2 py-1 rounded-lg text-[10px] font-bold text-slate-500 shadow-sm">
-                    {roomState.location} 반경 1km
-                  </div>
-
-                  {/* Winning Restaurant Pins (Mock coordinates mapping) */}
-                  {roomState.matchedRestaurants.map((res, index) => {
-                    const pinOffsets = [
-                      { top: '40%', left: '30%' },
-                      { top: '65%', left: '60%' },
-                      { top: '25%', left: '50%' },
-                      { top: '80%', left: '20%' },
-                      { top: '50%', left: '80%' }
-                    ];
-                    const offset = pinOffsets[index] || { top: '50%', left: '50%' };
-
-                    return (
-                      <div 
-                        key={res.id}
-                        className="absolute cursor-pointer group flex flex-col items-center"
-                        style={{ top: offset.top, left: offset.left }}
-                      >
-                        <div className="w-6 h-6 rounded-full bg-rose-500 text-white font-extrabold text-[10px] flex items-center justify-center border-2 border-white shadow-lg hover:scale-125 transition-all animate-bounce" style={{ animationDuration: `${2 + index * 0.5}s` }}>
-                          {index + 1}
-                        </div>
-                        {/* Tooltip on hover */}
-                        <div className="absolute bottom-8 scale-0 group-hover:scale-100 bg-slate-800 text-white text-[9px] font-bold px-2 py-1 rounded shadow-lg whitespace-nowrap transition-all z-20">
-                          {res.name}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              {/* Real Kakao Map Component with Auto Mock Fallback */}
+              <KakaoMap 
+                matchedRestaurants={roomState.matchedRestaurants} 
+                location={roomState.location} 
+              />
 
               {/* Restaurant List Feed */}
               <div className="flex flex-col gap-3">
