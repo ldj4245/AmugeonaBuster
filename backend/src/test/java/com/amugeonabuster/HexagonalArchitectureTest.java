@@ -1,0 +1,21 @@
+package com.amugeonabuster;
+
+import com.tngtech.archunit.junit.AnalyzeClasses;
+import com.tngtech.archunit.junit.ArchTest;
+import com.tngtech.archunit.lang.ArchRule;
+
+import static com.tngtech.archunit.library.Architectures.onionArchitecture;
+
+@AnalyzeClasses(packages = "com.amugeonabuster")
+public class HexagonalArchitectureTest {
+
+    @ArchTest
+    public static final ArchRule 헥사고날_의존성_무결성_검증 = onionArchitecture()
+            .domainModels("..domain..")
+            .domainServices("..application.service..")
+            .applicationServices("..application.service..")
+            .adapter("web", "..adapter.in.web..")
+            .adapter("websocket", "..adapter.in.websocket..")
+            .adapter("persistence", "..adapter.out.persistence..")
+            .adapter("external", "..adapter.out.external..");
+}
