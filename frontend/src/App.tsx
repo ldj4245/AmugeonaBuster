@@ -316,7 +316,7 @@ function App() {
           content: {
             title: '아무거나 버스터 매칭 완료! 🎯',
             description: `📍 위치: ${loc}\n🏆 최종 매칭 메뉴: ${emoji} ${winningMenu}\n친구들과 함께 고른 최고의 메뉴와 맛집을 확인해 보세요!`,
-            imageUrl: `${window.location.origin}/favicon.png`,
+            imageUrl: `${PROD_URL}/favicon.png`,
             link: {
               mobileWebUrl: shareUrl,
               webUrl: shareUrl,
