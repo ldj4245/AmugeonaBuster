@@ -299,7 +299,10 @@ function App() {
       return;
     }
 
-    const shareUrl = `${window.location.origin}/?room=${roomId}`;
+    const origin = window.location.hostname === 'localhost'
+      ? 'https://amugeona-buster-6eda848df67d.herokuapp.com'
+      : window.location.origin;
+    const shareUrl = `${origin}/?room=${roomId}`;
     const winningMenu = roomState?.winningMenu || '';
     const emoji = MENU_METADATA[winningMenu]?.emoji || '🍴';
     const loc = roomState?.location || '선택한 위치';
@@ -354,7 +357,10 @@ function App() {
   // 결과 요약 클립보드 복사
   const handleCopyLink = () => {
     if (!roomId) return;
-    const shareUrl = `${window.location.origin}/?room=${roomId}`;
+    const origin = window.location.hostname === 'localhost'
+      ? 'https://amugeona-buster-6eda848df67d.herokuapp.com'
+      : window.location.origin;
+    const shareUrl = `${origin}/?room=${roomId}`;
     const winningMenu = roomState?.winningMenu || '';
     const emoji = MENU_METADATA[winningMenu]?.emoji || '🍴';
     const loc = roomState?.location || '선택한 위치';
