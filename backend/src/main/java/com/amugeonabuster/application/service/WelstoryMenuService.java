@@ -338,20 +338,61 @@ public class WelstoryMenuService {
                     .build());
                 break;
 
-            default: // 주말 및 공휴일용 힐링 메뉴
+            default: // 주말 및 공휴일용 지점별 특선 힐링 메뉴 (사용자 오해 방지용 테마 연동)
+                String localSpecial = "소고기 버섯 전골";
+                String localSpecialDetails = "소고기 버섯 전골 & 즉석 야채 전, 잡곡밥, 오징어 젓갈, 배추김치";
+                String localNoodle = "베이컨 까르보나라 파스타";
+                String localNoodleDetails = "베이컨 까르보나라 파스타, 고르곤졸라 피자(1인용), 그린 그린 그린샐러드, 피클";
+                String localImageA = "https://images.unsplash.com/photo-1544025162-d76694265947?w=300";
+                String localImageB = "https://images.unsplash.com/photo-1546549032-9571cd6b27df?w=300";
+
+                if (cafeteriaName != null) {
+                    if (cafeteriaName.contains("수원")) {
+                        localSpecial = "수원 왕갈비탕";
+                        localSpecialDetails = "진한 소갈비로 푹 끓여낸 수원 디지털시티 명물 왕갈비탕, 석박지, 소면 사리, 양파 절임";
+                        localNoodle = "수원 불갈비 피자";
+                        localNoodleDetails = "수원식 불갈비 토핑을 듬뿍 올린 수제 씬 피자, 아삭 오이 피클, 코울슬로";
+                        localImageA = "https://images.unsplash.com/photo-1544025162-d76694265947?w=300";
+                    } else if (cafeteriaName.contains("서초")) {
+                        localSpecial = "서초동 정통 규동";
+                        localSpecialDetails = "우삼겹을 가득 올린 일본식 소고기 덮밥(규동), 온센타마고(반숙란), 베니쇼가, 미소 장국";
+                        localNoodle = "명란 크림 파스타";
+                        localNoodleDetails = "고소한 크림 베이스에 짭조름한 명란젓을 올린 서초 임직원 전용 명란 크림 파스타, 마늘 바게트";
+                        localImageA = "https://images.unsplash.com/photo-1627308595229-7830a5c91f9f?w=300";
+                    } else if (cafeteriaName.contains("기흥")) {
+                        localSpecial = "기흥식 석쇠 고추장 불고기";
+                        localSpecialDetails = "매콤한 고추장 양념의 불향 가득 석쇠 불고기 쌈밥 정식, 쌈채소, 우렁 강된장, 흑미밥";
+                        localNoodle = "얼큰 탄탄멘";
+                        localNoodleDetails = "고소한 땅콩 육수와 특제 라유 소스로 끓여낸 기흥 캠퍼스 피로회복용 매운 탄탄멘, 군만두";
+                        localImageA = "https://images.unsplash.com/photo-1544025162-d76694265947?w=300";
+                    } else if (cafeteriaName.contains("화성")) {
+                        localSpecial = "화성 융건릉 매운 소갈비찜";
+                        localSpecialDetails = "야들야들하게 졸여낸 화성 특선 매콤 소갈비찜 정식, 한식 잡채, 백미밥, 시원한 동치미";
+                        localNoodle = "해물 순두부 짬뽕밥";
+                        localNoodleDetails = "얼큰한 해물 짬뽕 국물에 몽글몽글한 순두부를 가득 채운 화성 반도체 스페셜 해물 순두부 짬뽕, 야채 튀김";
+                        localImageA = "https://images.unsplash.com/photo-1627308595229-7830a5c91f9f?w=300";
+                    } else if (cafeteriaName.contains("본사")) {
+                        localSpecial = "웰스토리 시그니처 한우 양지 국밥";
+                        localSpecialDetails = "국내산 한우 양지를 푹 고아 얼큰하고 시원하게 끓여낸 웰스토리 본사 임직원 활력 국밥, 도토리묵";
+                        localNoodle = "수제 랍스터 오일 스파게티";
+                        localNoodleDetails = "통통한 랍스터 테일과 향긋한 마늘 오일이 어우러진 본사 특선 프리미엄 랍스터 스파게티";
+                        localImageA = "https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=300";
+                    }
+                }
+
                 courses.add(CourseMenu.builder()
-                    .courseName("A코스 (주말 특선)")
-                    .menuDetails("소고기 버섯 전골 & 즉석 야채 전, 잡곡밥, 오징어 젓갈, 배추김치")
+                    .courseName("A코스 (" + localSpecial + ")")
+                    .menuDetails(localSpecialDetails)
                     .calories(790)
                     .price("8,000원")
-                    .imageUrl("https://images.unsplash.com/photo-1544025162-d76694265947?w=300")
+                    .imageUrl(localImageA)
                     .build());
                 courses.add(CourseMenu.builder()
-                    .courseName("B코스 (양식 특선)")
-                    .menuDetails("베이컨 까르보나라 파스타, 고르곤졸라 피자(1인용), 그린 그린 그린샐러드, 피클")
+                    .courseName("B코스 (" + localNoodle + ")")
+                    .menuDetails(localNoodleDetails)
                     .calories(870)
                     .price("8,500원")
-                    .imageUrl("https://images.unsplash.com/photo-1546549032-9571cd6b27df?w=300")
+                    .imageUrl(localImageB)
                     .build());
                 break;
         }

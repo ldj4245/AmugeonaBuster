@@ -2256,11 +2256,13 @@ function App() {
                 })()}
 
             {/* 6. 모달 하단 퀵 액션 */}
-            <div className="bg-zinc-50/80 border-t border-zinc-200 p-4 shrink-0 flex items-center justify-between gap-4 text-xs font-bold text-zinc-500 sm:px-6">
-              <span>💡 카카오톡 식단 알림의 발송 시간, 수신 요일, 대상 식당 지점은 우측 상단의 설정(⚙️) 아이콘을 통해 언제든지 자유롭게 수정하실 수 있습니다.</span>
+            <div className="bg-zinc-50/80 border-t border-zinc-200 p-4 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-bold text-zinc-500 sm:px-6">
+              <span className="leading-relaxed">
+                📢 <span className="text-orange-600">주말/공휴일에는 구내식당이 휴무</span>이므로, 지점 변경 테스트를 원활히 돕기 위해 각 지점별 시그니처 힐링 모의 식단(수원 갈비탕, 서초 규동 등)이 동적으로 로드됩니다! 평일에는 실제 라이브 데이터가 실시간으로 수집됩니다.
+              </span>
               <button 
                 onClick={() => setIsMenuDetailOpen(false)}
-                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-900 text-white rounded-lg transition-colors cursor-pointer shrink-0"
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-900 text-white rounded-lg transition-colors cursor-pointer shrink-0 align-self-end sm:align-self-auto"
               >
                 닫기
               </button>
