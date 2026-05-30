@@ -3,6 +3,7 @@ import { Flame, Compass, Users, Sparkles, MapPin, ArrowRight, CheckCircle2, Refr
 import TinderCard from 'react-tinder-card';
 import { useWebSocket, WebSocketRoomResponse } from './hooks/useWebSocket';
 import { KakaoMap } from './components/KakaoMap';
+const brandLogo = new URL('./amugeona_buster_logo.png', import.meta.url).href;
 
 // 메뉴 카테고리 정보 및 아이콘 정보 매핑
 const MENU_METADATA: Record<string, { emoji: string; category: string; description: string; gradient: string }> = {
@@ -282,8 +283,8 @@ function App() {
       {/* Header */}
       <header className="max-w-5xl mx-auto w-full px-6 py-5 flex items-center justify-between">
         <div className="flex items-center gap-2.5 cursor-pointer" onClick={resetSession}>
-          <div className="w-9 h-9 rounded-lg bg-orange-500 flex items-center justify-center text-white">
-            <Flame className="w-4.5 h-4.5" />
+          <div className="w-9 h-9 rounded-lg overflow-hidden border border-zinc-200 shadow-xs bg-white">
+            <img src={brandLogo} alt="아무거나 버스터 로고" className="w-full h-full object-cover" />
           </div>
           <div className="flex flex-col">
             <span className="text-base font-black text-zinc-800 leading-none">아무거나 버스터</span>
