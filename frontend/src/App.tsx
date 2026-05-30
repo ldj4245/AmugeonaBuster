@@ -664,7 +664,6 @@ function App() {
                   <div className="flex flex-col gap-2">
                     {[...roomState.voteStats]
                       .sort((a, b) => (b.likes + b.dislikes) - (a.likes + a.dislikes))
-                      .slice(0, 5)
                       .map((stat) => {
                         const total = stat.likes + stat.dislikes;
                         const maxTotal = Math.max(...roomState.voteStats!.map(s => s.likes + s.dislikes));
