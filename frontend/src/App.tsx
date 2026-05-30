@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Flame, Compass, Users, Sparkles, MapPin, ArrowRight, CheckCircle2, RefreshCw, Phone, Info, AlertCircle, Copy } from 'lucide-react';
+import { Flame, Compass, Users, Sparkles, MapPin, ArrowRight, CheckCircle2, RefreshCw, Phone, Info, AlertCircle, Copy, X } from 'lucide-react';
 import TinderCard from 'react-tinder-card';
 import { useWebSocket, WebSocketRoomResponse } from './hooks/useWebSocket';
 import { KakaoMap } from './components/KakaoMap';
@@ -23,6 +23,15 @@ const MENU_METADATA: Record<string, { emoji: string; category: string; descripti
   "쌀국수": { emoji: "🍜", category: "아시안 / 면류", description: "깔끔하고 담백한 육수에 고수와 양지가 어우러진 쌀국수!", gradient: "from-teal-400 to-emerald-600" },
   "팟타이": { emoji: "🍳", category: "아시안 / 볶음면", description: "새콤달콤 소스에 새우와 두부를 볶아낸 태국 대표 요리!", gradient: "from-amber-400 to-emerald-500" }
 };
+
+const PRESETS = [
+  { name: "삼성 DSR 타워 웰스토리", cotNo: "WEL_DSR", hallNo: "HALL_01" },
+  { name: "삼성전자 수원디지털시티 R5", cotNo: "WEL_SUWON", hallNo: "HALL_02" },
+  { name: "삼성전자 기흥캠퍼스 MR1", cotNo: "WEL_GIHEUNG", hallNo: "HALL_03" },
+  { name: "삼성전자 화성캠퍼스 D1", cotNo: "WEL_HWASEONG", hallNo: "HALL_04" },
+  { name: "삼성전자 서초사옥 웰스토리", cotNo: "WEL_SEOCHO", hallNo: "HALL_05" },
+  { name: "삼성웰스토리 본사 식당", cotNo: "WEL_HQ", hallNo: "HALL_06" }
+];
 
 const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 const BASE_URL = isLocalDev
@@ -50,24 +59,101 @@ function App() {
   const [swipeCount, setSwipeCount] = useState(0);
   const [copied, setCopied] = useState(false);
 
-  // URL에서 초대 코드가 존재하는지 확인 및 자동 뷰 세팅
+  // 🍱 웰스토리 알림 설정 관련 상태 변수
+  const [isWelstoryModalOpen, setIsWelstoryModalOpen] = useState(false);
+  const [welstorySettings, setWelstorySettings] = useState<any>(null);
+
+  // 🍱 웰스토리 알림 설정 전용 폼 상태 변수
+  const [selectedPreset, setSelectedPreset] = useState<number | 'custom'>(0);
+  const [customCotNo, setCustomCotNo] = useState('');
+  const [customHallNo, setCustomHallNo] = useState('');
+  const [customCafeteriaName, setCustomCafeteriaName] = useState('');
+  const [activeDays, setActiveDays] = useState<number[]>([1, 2, 3, 4, 5]); // 월~금 기본값
+  const [timeStr, setTimeStr] = useState('11:30');
+  const [isAlertEnabled, setIsAlertEnabled] = useState(true);
+
+  const [testResult, setTestResult] = useState<string | null>(null);
+  const [testSuccess, setTestSuccess] = useState<boolean | null>(null);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [testLoading, setTestLoading] = useState(false);
+  
+  const isEscapingRef = useRef(false);
+
+  // URL 파라미터 감지 및 자동 기동 효과
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const roomCode = urlParams.get('room');
+    const escape = urlParams.get('escape');
+    const escapeLocation = urlParams.get('location');
+    const welstoryParam = urlParams.get('welstory');
+    const code = urlParams.get('code');
+
+    // 1. 구식 탈출 자동 매칭 (?escape=true&location=...)
+    if (escape === 'true' && escapeLocation && !isEscapingRef.current) {
+      isEscapingRef.current = true;
+      const decodedLoc = decodeURIComponent(escapeLocation);
+      setLocation(decodedLoc);
+      setNickname('구식탈출러');
+      
+      // URL 파라미터 정리
+      const cleanUrl = window.location.origin + window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+      
+      autoTriggerEscapeFlow(decodedLoc);
+      return;
+    }
+
+    // 2. 카카오 로그인 리다이렉트 처리 (?code=...)
+    if (code) {
+      setLoading(true);
+      const cleanUrl = window.location.origin + window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+
+      fetch(`${window.location.origin}/api/welstory/token-exchange`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, redirectUri: window.location.origin })
+      })
+        .then(async (res) => {
+          if (res.ok) {
+            const data = await res.json();
+            localStorage.setItem('welstory_kakao_id', data.kakaoId);
+            setWelstorySettings(data);
+            setIsWelstoryModalOpen(true); // 설정창 자동 열기
+          } else {
+            throw new Error('카카오 토큰 교환 실패');
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          alert('카카오 인증 연동에 실패했습니다. 다시 시도해 주세요.');
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+      return;
+    }
+
+    // 3. 알림 수동 변경 파라미터 감지 (?welstory=true)
+    if (welstoryParam === 'true') {
+      setIsWelstoryModalOpen(true);
+      // URL 정리
+      const cleanUrl = window.location.origin + window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+    }
+
+    // 4. 기존 로드 (초대코드)
     if (roomCode) {
       const formattedCode = roomCode.trim().toUpperCase();
       setRoomCodeInput(formattedCode);
       setIsJoinView(true);
 
-      // 방의 현재 매칭 상태를 백엔드에서 미리 비동기로 조회해봅니다.
       setLoading(true);
       fetch(`${BASE_URL}/${formattedCode}`)
         .then(async (res) => {
           if (res.ok) {
             const data = await res.json();
             console.log('📬 Loaded shared room state on mount:', data);
-            
-            // 만약 방이 이미 완료(COMPLETED)된 상태라면, 참여 과정을 생략하고 결과 창을 즉시 노출합니다!
             if (data.status === 'COMPLETED') {
               setRoomId(data.roomId);
               setRoomState(data);
@@ -81,7 +167,264 @@ function App() {
           setLoading(false);
         });
     }
+
+    // 5. 이미 로그인된 웰스토리 카카오 세션이 있으면 설정 백그라운드 선형 프리페치
+    const savedKakaoId = localStorage.getItem('welstory_kakao_id');
+    if (savedKakaoId) {
+      fetch(`${window.location.origin}/api/welstory/settings?kakaoId=${savedKakaoId}`)
+        .then(async (res) => {
+          if (res.ok) {
+            const data = await res.json();
+            setWelstorySettings(data);
+          }
+        })
+        .catch(err => {
+          console.error('Failed to pre-fetch welstory settings:', err);
+        });
+    }
   }, []);
+
+  // 구내식당 탈출 자동 연동 플로우 (방생성 -> 게임시작 -> 전원 자동 스와이프 완료 -> 결과 로딩)
+  const autoTriggerEscapeFlow = async (loc: string) => {
+    setLoading(true);
+    setErrorMessage(null);
+    try {
+      // 1. 방 개설 API
+      const createResponse = await fetch(BASE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hostNickname: '구식탈출고양이',
+          location: loc,
+          customMenus: Object.keys(MENU_METADATA)
+        })
+      });
+
+      if (!createResponse.ok) {
+        throw new Error('구내식당 탈출 방 생성을 완료하지 못했습니다.');
+      }
+
+      const roomData = await createResponse.json();
+      const createdRoomId = roomData.roomId;
+      const hostId = roomData.hostId;
+
+      setRoomId(createdRoomId);
+      setMyMemberId(hostId);
+      setRoomState(roomData);
+
+      // 2. 대기실 게임 시작
+      const startResponse = await fetch(`${BASE_URL}/${createdRoomId}/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hostId: hostId })
+      });
+
+      if (!startResponse.ok) {
+        throw new Error('구내식당 탈출 투표 기동에 실패했습니다.');
+      }
+
+      const startedData = await startResponse.json();
+      setRoomState(startedData);
+
+      // 3. 모든 기본 메뉴 좋아요 자동 스와이프 전송 (즉시 완료 마크)
+      const menus = roomData.defaultMenus;
+      for (const menuName of menus) {
+        await fetch(`${BASE_URL}/${createdRoomId}/swipes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            memberId: hostId,
+            menuName: menuName,
+            isLike: true
+          })
+        });
+      }
+
+      // 4. 최종 완성 데이터 동기화 조회
+      const finalResponse = await fetch(`${BASE_URL}/${createdRoomId}`);
+      if (finalResponse.ok) {
+        const finalData = await finalResponse.json();
+        setRoomState(finalData);
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || '구내식당 탈출 도중 예상치 못한 통신 오류가 생겼습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 카카오 계정 연동 개시 (OAuth 리다이렉트 주소 획득)
+  const handleKakaoLink = async () => {
+    try {
+      const response = await fetch(`${window.location.origin}/api/welstory/auth-url?redirectUri=${window.location.origin}`);
+      if (response.ok) {
+        const data = await response.json();
+        window.location.href = data.url;
+      } else {
+        alert('카카오 인증 게이트웨이 호출 실패');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('서버 게이트웨이 통신 실패');
+    }
+  };
+
+  // 🍱 모달이 켜지거나 설정 정보가 세팅될 때 폼 값 초기화
+  useEffect(() => {
+    if (isWelstoryModalOpen && welstorySettings) {
+      const presetIdx = PRESETS.findIndex(p => p.cotNo === welstorySettings.cotNo && p.hallNo === welstorySettings.hallNo);
+      if (presetIdx !== -1) {
+        setSelectedPreset(presetIdx);
+      } else {
+        setSelectedPreset('custom');
+        setCustomCotNo(welstorySettings.cotNo || '');
+        setCustomHallNo(welstorySettings.hallNo || '');
+        setCustomCafeteriaName(welstorySettings.cafeteriaName || '');
+      }
+
+      if (welstorySettings.scheduledDays) {
+        const days = welstorySettings.scheduledDays.split(',').map((d: string) => parseInt(d, 10));
+        setActiveDays(days);
+      }
+      
+      setTimeStr(welstorySettings.scheduledTime || '11:30');
+      setIsAlertEnabled(welstorySettings.enabled !== undefined ? welstorySettings.enabled : true);
+      setTestResult(null);
+      setTestSuccess(null);
+    }
+  }, [isWelstoryModalOpen, welstorySettings]);
+
+  // 🍱 알림 설정 저장 처리
+  const handleSaveSettings = async () => {
+    if (!welstorySettings?.kakaoId) return;
+    setSaveLoading(true);
+    setTestResult(null);
+
+    let finalCotNo = '';
+    let finalHallNo = '';
+    let finalName = '';
+
+    if (selectedPreset === 'custom') {
+      finalCotNo = customCotNo.trim();
+      finalHallNo = customHallNo.trim();
+      finalName = customCafeteriaName.trim() || '사내식당';
+    } else {
+      const preset = PRESETS[selectedPreset as number];
+      finalCotNo = preset.cotNo;
+      finalHallNo = preset.hallNo;
+      finalName = preset.name;
+    }
+
+    if (!finalCotNo || !finalHallNo) {
+      alert('구내식당 회사 및 식당 코드를 입력해 주세요.');
+      setSaveLoading(false);
+      return;
+    }
+
+    const payload = {
+      kakaoId: welstorySettings.kakaoId,
+      nickname: welstorySettings.nickname || '사용자',
+      kakaoAccessToken: welstorySettings.kakaoAccessToken,
+      kakaoRefreshToken: welstorySettings.kakaoRefreshToken,
+      cotNo: finalCotNo,
+      hallNo: finalHallNo,
+      cafeteriaName: finalName,
+      scheduledDays: activeDays.sort().join(','),
+      scheduledTime: timeStr,
+      isEnabled: isAlertEnabled
+    };
+
+    try {
+      const response = await fetch(`${window.location.origin}/api/welstory/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        const saved = await response.json();
+        setWelstorySettings(saved);
+        alert('🎉 알림 설정이 안전하게 저장되었습니다!');
+        setIsWelstoryModalOpen(false);
+      } else {
+        alert('알림 설정 저장에 실패했습니다.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('서버와 통신하는 중 오류가 생겼습니다.');
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  // 🍱 테스트 즉시 발송
+  const handleTestSend = async () => {
+    if (!welstorySettings?.kakaoId) return;
+    setTestLoading(true);
+    setTestResult(null);
+    setTestSuccess(null);
+
+    let finalCotNo = '';
+    let finalHallNo = '';
+    let finalName = '';
+
+    if (selectedPreset === 'custom') {
+      finalCotNo = customCotNo.trim();
+      finalHallNo = customHallNo.trim();
+      finalName = customCafeteriaName.trim() || '사내식당';
+    } else {
+      const preset = PRESETS[selectedPreset as number];
+      finalCotNo = preset.cotNo;
+      finalHallNo = preset.hallNo;
+      finalName = preset.name;
+    }
+
+    const savePayload = {
+      kakaoId: welstorySettings.kakaoId,
+      nickname: welstorySettings.nickname || '사용자',
+      kakaoAccessToken: welstorySettings.kakaoAccessToken,
+      kakaoRefreshToken: welstorySettings.kakaoRefreshToken,
+      cotNo: finalCotNo,
+      hallNo: finalHallNo,
+      cafeteriaName: finalName,
+      scheduledDays: activeDays.sort().join(','),
+      scheduledTime: timeStr,
+      isEnabled: isAlertEnabled
+    };
+
+    try {
+      // 선행 저장
+      await fetch(`${window.location.origin}/api/welstory/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(savePayload)
+      });
+
+      // 발송 요청
+      const response = await fetch(`${window.location.origin}/api/welstory/test-send?kakaoId=${welstorySettings.kakaoId}`, {
+        method: 'POST'
+      });
+
+      const data = await response.json();
+      setTestSuccess(data.success);
+      setTestResult(data.message);
+    } catch (err: any) {
+      console.error(err);
+      setTestSuccess(false);
+      setTestResult('발송 중 오류 발생: ' + err.message);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  // 🍱 카카오 연동 해제
+  const handleDisconnect = () => {
+    if (window.confirm('정말 카카오 연동을 해제하시겠습니까?\n해제하시면 매일 구동되는 자동 알림도 함께 비활성화됩니다.')) {
+      localStorage.removeItem('welstory_kakao_id');
+      setWelstorySettings(null);
+      alert('카카오 연동이 해제되었습니다.');
+    }
+  };
 
   // 실시간 웹소켓 수신 이벤트 바인딩
   const handleWebSocketMessage = useCallback((updatedState: WebSocketRoomResponse) => {
@@ -409,6 +752,16 @@ function App() {
               나가기
             </button>
           </div>
+        )}
+
+        {!roomId && (
+          <button
+            onClick={() => setIsWelstoryModalOpen(true)}
+            className="flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white px-3.5 py-2 rounded-lg text-xs font-bold shadow-md transition-all scale-100 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            웰스토리 식단 알림 🔔
+          </button>
         )}
       </header>
 
@@ -1074,6 +1427,263 @@ function App() {
         )}
 
       </main>
+
+      {/* 🍱 웰스토리 식단 알림 설정 모달 */}
+      {isWelstoryModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-zinc-100 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh] scale-100 transition-all duration-300">
+            {/* Modal Cover Header */}
+            <div className="bg-gradient-to-r from-orange-500 to-amber-500 text-white p-6 relative flex flex-col gap-1 shrink-0">
+              <button 
+                onClick={() => setIsWelstoryModalOpen(false)}
+                className="absolute top-4 right-4 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-1.5 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <span className="text-xl font-bold flex items-center gap-2">🍱 웰스토리 식단 알림 설정</span>
+              <p className="text-xs text-white/85">매번 식단 앱 켜지 않고 내 카카오톡으로 오늘 메뉴 자동 배달!</p>
+            </div>
+
+            {/* Modal Body with Scroll */}
+            <div className="overflow-y-auto p-6 flex flex-col gap-6">
+              {!welstorySettings ? (
+                /* STEP 1: 카카오 로그인 연동 전 */
+                <div className="flex flex-col items-center text-center gap-5 py-4">
+                  <div className="w-16 h-16 rounded-full bg-orange-50 flex items-center justify-center text-orange-500">
+                    <Sparkles className="w-8 h-8" />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <h4 className="font-bold text-zinc-800 text-base">카카오 계정을 한 번만 연동해 주세요</h4>
+                    <p className="text-xs text-zinc-500 max-w-xs leading-relaxed">
+                      연동 완료 후 오늘의 구내식당 지점 코드 및 배달받고 싶은 요일, 시간을 언제든 설정할 수 있습니다.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleKakaoLink}
+                    disabled={loading}
+                    className="w-full bg-[#FEE500] hover:bg-[#FDD000] text-[#191919] font-bold py-3.5 px-6 rounded-xl flex items-center justify-center gap-2.5 shadow-sm hover:shadow transition-all duration-200 cursor-pointer disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <RefreshCw className="w-4 h-4 animate-spin text-[#191919]" />
+                    ) : (
+                      <>
+                        <span className="w-4 h-4 rounded-full bg-[#191919] text-[#FEE500] text-[9px] font-black flex items-center justify-center font-mono">TALK</span>
+                        카카오 계정으로 연동하기
+                      </>
+                    )}
+                  </button>
+                </div>
+              ) : (
+                /* STEP 2: 설정 세팅 화면 */
+                <div className="flex flex-col gap-5 text-zinc-700">
+                  
+                  {/* 카카오 연동 유저 프로필 헤더 */}
+                  <div className="bg-zinc-50 border border-zinc-100 p-3.5 rounded-xl flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-[#FEE500] text-[#191919] font-bold text-xs flex items-center justify-center">
+                        {welstorySettings.nickname ? welstorySettings.nickname.charAt(0) : 'U'}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold text-zinc-800">{welstorySettings.nickname}님</span>
+                        <span className="text-[9px] text-zinc-400 font-mono">ID: {welstorySettings.kakaoId}</span>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={handleDisconnect}
+                      className="text-[10px] font-semibold text-zinc-400 hover:text-red-500 border border-zinc-200 hover:border-red-100 bg-white px-2 py-1 rounded-lg transition-colors cursor-pointer"
+                    >
+                      연동 해제
+                    </button>
+                  </div>
+
+                  {/* 1. 지점 검색 및 입력 */}
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-zinc-800 flex items-center gap-1">📍 1. 구내식당 지점 코드 선택</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {PRESETS.map((p, idx) => (
+                        <button
+                          key={p.name}
+                          type="button"
+                          onClick={() => setSelectedPreset(idx)}
+                          className={`p-2.5 rounded-lg border text-left text-xs font-medium transition-all cursor-pointer ${
+                            selectedPreset === idx 
+                              ? 'bg-orange-50 border-orange-300 text-orange-600 font-bold shadow-xs' 
+                              : 'bg-white border-zinc-200 text-zinc-600 hover:border-zinc-300'
+                          }`}
+                        >
+                          {p.name.replace(' 웰스토리', '').replace('식당', '')}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedPreset('custom');
+                          if (customCotNo === '') {
+                            setCustomCotNo('WEL_CUSTOM');
+                            setCustomHallNo('HALL_99');
+                            setCustomCafeteriaName('사내 웰스토리');
+                          }
+                        }}
+                        className={`p-2.5 rounded-lg border text-left text-xs font-medium transition-all cursor-pointer ${
+                          selectedPreset === 'custom'
+                            ? 'bg-orange-50 border-orange-300 text-orange-600 font-bold shadow-xs'
+                            : 'bg-white border-zinc-200 text-zinc-600 hover:border-zinc-300'
+                        }`}
+                      >
+                        ⚙️ 코드 직접 입력
+                      </button>
+                    </div>
+
+                    {/* 직접 입력 시 상세 필드 노출 */}
+                    {selectedPreset === 'custom' && (
+                      <div className="bg-zinc-50 border border-zinc-200 p-4 rounded-xl flex flex-col gap-3.5 mt-1 animate-in fade-in-50 slide-in-from-top-2 duration-200">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-semibold text-zinc-500">회사 코드 (cotNo)</label>
+                          <input 
+                            type="text" 
+                            placeholder="예: WEL_DSR"
+                            value={customCotNo}
+                            onChange={(e) => setCustomCotNo(e.target.value)}
+                            className="w-full px-3 py-2 text-xs rounded border border-zinc-200 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-semibold text-zinc-500">식당 번호 (hallNo)</label>
+                          <input 
+                            type="text" 
+                            placeholder="예: HALL_01"
+                            value={customHallNo}
+                            onChange={(e) => setCustomHallNo(e.target.value)}
+                            className="w-full px-3 py-2 text-xs rounded border border-zinc-200 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-semibold text-zinc-500">식당 표기 명칭</label>
+                          <input 
+                            type="text" 
+                            placeholder="예: 삼성 DSR 웰스토리"
+                            value={customCafeteriaName}
+                            onChange={(e) => setCustomCafeteriaName(e.target.value)}
+                            className="w-full px-3 py-2 text-xs rounded border border-zinc-200 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. 발송 요일 설정 */}
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-zinc-800">📅 2. 알림 예약 요일</label>
+                    <div className="flex justify-between gap-1.5 bg-zinc-50 p-1.5 rounded-xl border border-zinc-200">
+                      {[
+                        { val: 1, label: '월' },
+                        { val: 2, label: '화' },
+                        { val: 3, label: '수' },
+                        { val: 4, label: '목' },
+                        { val: 5, label: '금' },
+                        { val: 6, label: '토' },
+                        { val: 7, label: '일' }
+                      ].map((day) => {
+                        const active = activeDays.includes(day.val);
+                        return (
+                          <button
+                            key={day.val}
+                            type="button"
+                            onClick={() => {
+                              if (active) {
+                                setActiveDays(activeDays.filter(d => d !== day.val));
+                              } else {
+                                setActiveDays([...activeDays, day.val]);
+                              }
+                            }}
+                            className={`w-9 h-9 rounded-lg font-bold text-xs flex items-center justify-center transition-all cursor-pointer ${
+                              active 
+                                ? 'bg-orange-500 text-white shadow-sm scale-105' 
+                                : 'bg-white hover:bg-zinc-100 text-zinc-500 border border-zinc-200'
+                            }`}
+                          >
+                            {day.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 3. 시간 설정 */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold text-zinc-800">⏰ 3. 알림 발송 시간</label>
+                      <input
+                        type="time"
+                        value={timeStr}
+                        onChange={(e) => setTimeStr(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl border border-zinc-200 bg-white text-zinc-800 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 font-mono font-bold text-sm text-center"
+                      />
+                    </div>
+                    
+                    {/* 4. 활성화 여부 토글 */}
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold text-zinc-800">📴 4. 알림 작동 여부</label>
+                      <button
+                        type="button"
+                        onClick={() => setIsAlertEnabled(!isAlertEnabled)}
+                        className={`w-full py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all border cursor-pointer ${
+                          isAlertEnabled 
+                            ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border-emerald-200' 
+                            : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-400 border-zinc-200'
+                        }`}
+                      >
+                        <CheckCircle2 className={`w-4 h-4 ${isAlertEnabled ? 'text-emerald-500' : 'text-zinc-300'}`} />
+                        {isAlertEnabled ? '매일 알림 구동 중' : '일시 정지됨'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 테스트 발송 피드백 박스 */}
+                  {testResult && (
+                    <div className={`p-4 rounded-xl border flex items-start gap-2.5 mt-1 text-xs animate-in fade-in-50 duration-200 ${
+                      testSuccess 
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                        : 'bg-red-50 border-red-200 text-red-700'
+                    }`}>
+                      <Info className={`w-4 h-4 shrink-0 mt-0.5 ${testSuccess ? 'text-emerald-500' : 'text-red-500'}`} />
+                      <span>{testResult}</span>
+                    </div>
+                  )}
+
+                  {/* 제어 버튼 그룹 */}
+                  <div className="mt-4 pt-4 border-t border-zinc-100 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={handleTestSend}
+                      disabled={testLoading || saveLoading}
+                      className="flex-1 py-3.5 bg-zinc-800 hover:bg-zinc-900 disabled:opacity-50 text-white font-bold rounded-xl transition-colors text-center text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                    >
+                      {testLoading ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        '테스트 전송 💬'
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveSettings}
+                      disabled={testLoading || saveLoading}
+                      className="flex-1 py-3.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 disabled:opacity-50 text-white font-bold rounded-xl transition-colors text-center text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                    >
+                      {saveLoading ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        '설정 저장하기 💾'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="w-full text-center py-5 text-xs text-zinc-400 border-t border-zinc-100">
