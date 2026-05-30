@@ -285,9 +285,10 @@ function App() {
           <div className="w-9 h-9 rounded-lg bg-orange-500 flex items-center justify-center text-white">
             <Flame className="w-4.5 h-4.5" />
           </div>
-          <span className="text-lg font-bold text-zinc-800">
-            오늘 뭐 먹지?
-          </span>
+          <div className="flex flex-col">
+            <span className="text-base font-black text-zinc-800 leading-none">아무거나 버스터</span>
+            <span className="text-[9px] font-semibold text-orange-500 uppercase tracking-wider mt-0.5 font-mono">Amugeona Buster</span>
+          </div>
         </div>
         
         {roomId && roomState && (
@@ -942,7 +943,7 @@ function App() {
 
       {/* Footer */}
       <footer className="w-full text-center py-5 text-xs text-zinc-400 border-t border-zinc-100">
-        © 2026 오늘 뭐 먹지?
+        © 2026 아무거나 버스터 (Amugeona Buster)
       </footer>
     </div>
   );
