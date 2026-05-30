@@ -2,6 +2,7 @@ package com.amugeonabuster.application.service;
 
 import com.amugeonabuster.application.port.in.CreateRoomUseCase.CreateRoomCommand;
 import com.amugeonabuster.application.port.in.JoinRoomUseCase.JoinRoomCommand;
+import com.amugeonabuster.application.port.out.BroadcastRoomStatePort;
 import com.amugeonabuster.application.port.out.LoadRoomPort;
 import com.amugeonabuster.application.port.out.SaveRoomPort;
 import com.amugeonabuster.domain.model.Room;
@@ -29,6 +30,9 @@ class RoomServiceTest {
 
     @Mock
     private LoadRoomPort loadRoomPort;
+
+    @Mock
+    private BroadcastRoomStatePort broadcastRoomStatePort;
 
     @InjectMocks
     private RoomService roomService;
@@ -79,6 +83,7 @@ class RoomServiceTest {
 
         verify(loadRoomPort, times(1)).loadRoom(roomId);
         verify(saveRoomPort, times(1)).saveRoom(existingRoom);
+        verify(broadcastRoomStatePort, times(1)).broadcastRoomState(existingRoom);
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.amugeonabuster.application.service;
 
 import com.amugeonabuster.application.port.in.CreateRoomUseCase;
 import com.amugeonabuster.application.port.in.JoinRoomUseCase;
+import com.amugeonabuster.application.port.out.BroadcastRoomStatePort;
 import com.amugeonabuster.application.port.out.LoadRoomPort;
 import com.amugeonabuster.application.port.out.SaveRoomPort;
 import com.amugeonabuster.domain.model.Member;
@@ -20,6 +21,7 @@ public class RoomService implements CreateRoomUseCase, JoinRoomUseCase {
 
     private final SaveRoomPort saveRoomPort;
     private final LoadRoomPort loadRoomPort;
+    private final BroadcastRoomStatePort broadcastRoomStatePort;
 
     private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -64,6 +66,9 @@ public class RoomService implements CreateRoomUseCase, JoinRoomUseCase {
         // 도메인 내부 가입 규칙 가동
         room.joinMember(guest);
         saveRoomPort.saveRoom(room);
+
+        // 실시간 대기실 유저 목록 자동 브로드캐스트 작동
+        broadcastRoomStatePort.broadcastRoomState(room);
 
         return room;
     }
