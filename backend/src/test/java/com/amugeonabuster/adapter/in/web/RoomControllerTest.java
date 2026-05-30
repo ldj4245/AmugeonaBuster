@@ -3,6 +3,7 @@ package com.amugeonabuster.adapter.in.web;
 import com.amugeonabuster.adapter.in.web.dto.*;
 import com.amugeonabuster.application.port.in.CreateRoomUseCase;
 import com.amugeonabuster.application.port.in.CreateRoomUseCase.CreateRoomCommand;
+import com.amugeonabuster.application.port.in.GetRoomUseCase;
 import com.amugeonabuster.application.port.in.JoinRoomUseCase;
 import com.amugeonabuster.application.port.in.JoinRoomUseCase.JoinRoomCommand;
 import com.amugeonabuster.application.port.in.StartVotingUseCase;
@@ -21,10 +22,12 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -40,6 +43,9 @@ class RoomControllerTest {
 
     @MockBean
     private CreateRoomUseCase createRoomUseCase;
+
+    @MockBean
+    private GetRoomUseCase getRoomUseCase;
 
     @MockBean
     private JoinRoomUseCase joinRoomUseCase;
@@ -170,5 +176,44 @@ class RoomControllerTest {
                 .andExpect(jsonPath("$.roomId").value(roomId))
                 .andExpect(jsonPath("$.totalMembers").value(1))
                 .andExpect(jsonPath("$.completedMembersCount").value(0)); // 15개 중 1개만 했으므로 완료수는 0
+    }
+
+    @Test
+    @DisplayName("특정 방의 상태 조회 API 호출 시 HTTP 200 상태코드와 방 데이터를 JSON으로 응답받는다")
+    void getRoom_api_success() throws Exception {
+        // given
+        String roomId = "ROOM-XYZ777";
+        UUID hostId = UUID.randomUUID();
+        Room room = Room.builder()
+                .id(roomId)
+                .hostId(hostId)
+                .location("여의도")
+                .status(RoomStatus.COMPLETED)
+                .winningMenu("삼겹살")
+                .build();
+
+        when(getRoomUseCase.getRoom(roomId)).thenReturn(Optional.of(room));
+
+        // when & then
+        mockMvc.perform(get("/api/rooms/{roomId}", roomId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roomId").value(roomId))
+                .andExpect(jsonPath("$.location").value("여의도"))
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.winningMenu").value("삼겹살"));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 방의 상태 조회 API 호출 시 HTTP 404 상태코드를 응답받는다")
+    void getRoom_api_notFound() throws Exception {
+        // given
+        String roomId = "ROOM-NONEXISTENT";
+        when(getRoomUseCase.getRoom(roomId)).thenReturn(Optional.empty());
+
+        // when & then
+        mockMvc.perform(get("/api/rooms/{roomId}", roomId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound());
     }
 }
