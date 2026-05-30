@@ -35,6 +35,8 @@ function App() {
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [isJoinView, setIsJoinView] = useState(false);
   const [selectedMenus, setSelectedMenus] = useState<string[]>(Object.keys(MENU_METADATA));
+  const [customCreatedMenus, setCustomCreatedMenus] = useState<string[]>([]);
+  const [customMenuInput, setCustomMenuInput] = useState('');
   
   // 게임 세션 관련 정보
   const [roomId, setRoomId] = useState<string | null>(null);
@@ -67,8 +69,23 @@ function App() {
     }
   }, [roomState]);
 
-  // 커스텀 훅 가동
+  // 실시간 웹소켓 수신 활성화
   useWebSocket(roomId, handleWebSocketMessage);
+
+  // 커스텀 메뉴 직접 추가 처리
+  const handleAddCustomMenu = () => {
+    const trimmed = customMenuInput.trim();
+    if (!trimmed) return;
+
+    if (Object.keys(MENU_METADATA).includes(trimmed) || customCreatedMenus.includes(trimmed)) {
+      alert('이미 존재하는 메뉴입니다.');
+      return;
+    }
+
+    setCustomCreatedMenus([...customCreatedMenus, trimmed]);
+    setSelectedMenus([...selectedMenus, trimmed]);
+    setCustomMenuInput('');
+  };
 
   // 방 개설 API 송신
   const handleCreateRoom = async (e: React.FormEvent) => {
@@ -413,37 +430,81 @@ function App() {
 
                     {/* Checklist Grid */}
                     <div className="grid grid-cols-3 gap-2 max-h-56 overflow-y-auto p-2 bg-white rounded-lg border border-zinc-200">
-                      {Object.entries(MENU_METADATA).map(([menuName, meta]) => {
+                      {[
+                        ...Object.entries(MENU_METADATA),
+                        ...customCreatedMenus.map(m => [m, { emoji: "🍴", category: "커스텀", description: "방장이 직접 추가한 메뉴입니다.", gradient: "from-orange-500 to-amber-500" }] as [string, { emoji: string; category: string; description: string; gradient: string; }])
+                      ].map(([menuName, meta]) => {
                         const isChecked = selectedMenus.includes(menuName);
+                        const isCustom = customCreatedMenus.includes(menuName);
                         return (
-                          <button
-                            key={menuName}
-                            type="button"
-                            onClick={() => {
-                              if (isChecked) {
-                                setSelectedMenus(selectedMenus.filter(m => m !== menuName));
-                              } else {
-                                setSelectedMenus([...selectedMenus, menuName]);
-                              }
-                            }}
-                            className={`flex flex-col items-center justify-center p-2 rounded-xl border text-center transition-all ${
-                              isChecked
-                                ? 'border-orange-500 bg-orange-50/40 text-orange-950 font-semibold shadow-xs ring-1 ring-orange-500/20'
-                                : 'border-zinc-100 bg-zinc-50/50 hover:bg-zinc-50 text-zinc-600 hover:border-zinc-200'
-                            }`}
-                          >
-                            <span className="text-xl mb-1">{meta.emoji}</span>
-                            <span className="text-[10px] truncate w-full">{menuName}</span>
-                            <span className={`text-[7px] mt-0.5 px-1 py-0.5 rounded-sm border ${
-                              isChecked
-                                ? 'bg-orange-100/50 text-orange-700 border-orange-200/50'
-                                : 'bg-zinc-100/70 text-zinc-400 border-zinc-200/20'
-                            }`}>
-                              {meta.category.split('/')[0].trim()}
-                            </span>
-                          </button>
+                          <div key={menuName} className="relative">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isChecked) {
+                                  setSelectedMenus(selectedMenus.filter(m => m !== menuName));
+                                } else {
+                                  setSelectedMenus([...selectedMenus, menuName]);
+                                }
+                              }}
+                              className={`w-full flex flex-col items-center justify-center p-2 rounded-xl border text-center transition-all ${
+                                isChecked
+                                  ? 'border-orange-500 bg-orange-50/40 text-orange-950 font-semibold shadow-xs ring-1 ring-orange-500/20'
+                                  : 'border-zinc-100 bg-zinc-50/50 hover:bg-zinc-50 text-zinc-600 hover:border-zinc-200'
+                              }`}
+                            >
+                              <span className="text-xl mb-1">{meta.emoji}</span>
+                              <span className="text-[10px] truncate w-full">{menuName}</span>
+                              <span className={`text-[7px] mt-0.5 px-1 py-0.5 rounded-sm border ${
+                                isChecked
+                                  ? 'bg-orange-100/50 text-orange-700 border-orange-200/50'
+                                  : 'bg-zinc-100/70 text-zinc-400 border-zinc-200/20'
+                              }`}>
+                                {meta.category.split('/')[0].trim()}
+                              </span>
+                            </button>
+                            {isCustom && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCustomCreatedMenus(customCreatedMenus.filter(m => m !== menuName));
+                                  setSelectedMenus(selectedMenus.filter(m => m !== menuName));
+                                }}
+                                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[8px] font-bold hover:bg-red-600 shadow-sm active:scale-90 transition-all border border-white"
+                              >
+                                ×
+                              </button>
+                            )}
+                          </div>
                         );
                       })}
+                    </div>
+
+                    {/* 직접 추가 입력창 */}
+                    <div className="flex gap-2 mt-1">
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          placeholder="원하는 메뉴 직접 입력 (예: 마라엽떡)"
+                          value={customMenuInput}
+                          onChange={(e) => setCustomMenuInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddCustomMenu();
+                            }
+                          }}
+                          className="w-full px-3 py-2 text-xs rounded-lg border border-zinc-200 bg-white text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500 transition-colors"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddCustomMenu}
+                        className="px-4 py-2 text-xs font-semibold rounded-lg bg-zinc-800 hover:bg-zinc-900 text-white transition-colors active:scale-95 shadow-sm"
+                      >
+                        추가
+                      </button>
                     </div>
                   </div>
 
