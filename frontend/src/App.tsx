@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Flame, Compass, Users, Sparkles, MapPin, ArrowRight, CheckCircle2, RefreshCw, Phone, Info, AlertCircle } from 'lucide-react';
+import { Flame, Compass, Users, Sparkles, MapPin, ArrowRight, CheckCircle2, RefreshCw, Phone, Info, AlertCircle, Copy } from 'lucide-react';
 import TinderCard from 'react-tinder-card';
 import { useWebSocket, WebSocketRoomResponse } from './hooks/useWebSocket';
 import { KakaoMap } from './components/KakaoMap';
@@ -48,6 +48,7 @@ function App() {
 
   // 스와이프 완료된 인덱스 추적 및 로컬 진척
   const [swipeCount, setSwipeCount] = useState(0);
+  const [copied, setCopied] = useState(false);
 
   // URL에서 초대 코드가 존재하는지 확인 및 자동 뷰 세팅
   useEffect(() => {
@@ -265,6 +266,84 @@ function App() {
     if (!roomId) return;
     navigator.clipboard.writeText(roomId);
     alert('🔗 초대 코드가 클립보드에 성공적으로 복사되었습니다! 친구들에게 공유해 보세요.');
+  };
+
+  // 카카오톡 결과 공유하기
+  const shareToKakao = () => {
+    const apiKey = (import.meta as any).env.VITE_KAKAO_MAP_API_KEY;
+    if (!apiKey) {
+      alert('카카오 API 키가 설정되지 않았습니다.');
+      return;
+    }
+
+    const shareUrl = `${window.location.origin}/?room=${roomId}`;
+    const winningMenu = roomState?.winningMenu || '';
+    const emoji = MENU_METADATA[winningMenu]?.emoji || '🍴';
+    const loc = roomState?.location || '선택한 위치';
+
+    const sendFeed = () => {
+      const win = window as any;
+      if (win.Kakao) {
+        if (!win.Kakao.isInitialized()) {
+          win.Kakao.init(apiKey);
+        }
+        win.Kakao.Share.sendDefault({
+          objectType: 'feed',
+          content: {
+            title: '아무거나 버스터 매칭 완료! 🎯',
+            description: `📍 위치: ${loc}\n🏆 최종 매칭 메뉴: ${emoji} ${winningMenu}\n친구들과 함께 고른 최고의 메뉴와 맛집을 확인해 보세요!`,
+            imageUrl: `${window.location.origin}/favicon.png`,
+            link: {
+              mobileWebUrl: shareUrl,
+              webUrl: shareUrl,
+            },
+          },
+          buttons: [
+            {
+              title: '결과 확인하기',
+              link: {
+                mobileWebUrl: shareUrl,
+                webUrl: shareUrl,
+              },
+            },
+          ],
+        });
+      }
+    };
+
+    const win = window as any;
+    if (win.Kakao) {
+      sendFeed();
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js';
+      script.crossOrigin = 'anonymous';
+      script.onload = () => {
+        sendFeed();
+      };
+      script.onerror = () => {
+        alert('카카오 SDK 로드에 실패했습니다.');
+      };
+      document.head.appendChild(script);
+    }
+  };
+
+  // 결과 요약 클립보드 복사
+  const handleCopyLink = () => {
+    if (!roomId) return;
+    const shareUrl = `${window.location.origin}/?room=${roomId}`;
+    const winningMenu = roomState?.winningMenu || '';
+    const emoji = MENU_METADATA[winningMenu]?.emoji || '🍴';
+    const loc = roomState?.location || '선택한 위치';
+    
+    const text = `🎯 [아무거나 버스터] 실시간 스와이프 매칭 완료!\n\n📍 위치: ${loc}\n🏆 최종 매칭 메뉴: ${emoji} ${winningMenu}\n\n🔗 매칭 결과 및 맛집 정보 확인하기:\n${shareUrl}`;
+    
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(err => {
+      console.error('Failed to copy text: ', err);
+    });
   };
 
   // 로컬 세션 리셋하고 처음으로 돌아가기
@@ -848,6 +927,35 @@ function App() {
                   </div>
                 </div>
               )}
+
+              {/* Share Actions */}
+              <div className="w-full flex flex-col gap-2 pt-4 border-t border-zinc-100">
+                <p className="text-[11px] font-semibold text-zinc-400 text-left mb-1">📢 친구에게 결과 공유하기</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={shareToKakao}
+                    className="flex-1 py-2.5 bg-[#FEE500] hover:bg-[#FDD000] active:bg-[#E2CC00] text-[#191919] font-bold rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm border border-[#EBE39B]"
+                  >
+                    <span className="text-sm">💬</span> 카카오톡 공유
+                  </button>
+                  <button
+                    onClick={handleCopyLink}
+                    className="flex-1 py-2.5 bg-zinc-100 hover:bg-zinc-200 active:bg-zinc-300 text-zinc-700 font-bold rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 border border-zinc-200"
+                  >
+                    {copied ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        복사 완료!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        결과 요약 복사
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
 
               <button
                 onClick={resetSession}
