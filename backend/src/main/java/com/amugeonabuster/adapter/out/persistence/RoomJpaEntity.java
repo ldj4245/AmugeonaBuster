@@ -30,6 +30,9 @@ public class RoomJpaEntity {
     @Column(nullable = false)
     private RoomStatus status;
 
+    @Column(nullable = false)
+    private int maxSwipeCount;
+
     @OneToMany(mappedBy = "room", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<MemberJpaEntity> members = new ArrayList<>();
 
@@ -42,11 +45,12 @@ public class RoomJpaEntity {
     private List<RestaurantJpaEntity> matchedRestaurants = new ArrayList<>();
 
     @Builder
-    public RoomJpaEntity(String id, UUID hostId, String location, RoomStatus status, List<MemberJpaEntity> members, List<SwipeJpaEntity> swipes, String winningMenu, List<RestaurantJpaEntity> matchedRestaurants) {
+    public RoomJpaEntity(String id, UUID hostId, String location, RoomStatus status, int maxSwipeCount, List<MemberJpaEntity> members, List<SwipeJpaEntity> swipes, String winningMenu, List<RestaurantJpaEntity> matchedRestaurants) {
         this.id = id;
         this.hostId = hostId;
         this.location = location;
         this.status = status;
+        this.maxSwipeCount = maxSwipeCount != 0 ? maxSwipeCount : 15;
         this.members = members != null ? members : new ArrayList<>();
         this.swipes = swipes != null ? swipes : new ArrayList<>();
         this.winningMenu = winningMenu;

@@ -32,7 +32,8 @@ public class RoomController {
     public ResponseEntity<RoomResponse> createRoom(@RequestBody CreateRoomRequest request) {
         CreateRoomCommand command = new CreateRoomCommand(
                 request.getHostNickname(),
-                request.getLocation()
+                request.getLocation(),
+                request.getMaxSwipeCount()
         );
 
         Room room = createRoomUseCase.createRoom(command);

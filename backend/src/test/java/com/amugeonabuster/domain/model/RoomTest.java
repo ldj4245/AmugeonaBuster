@@ -227,4 +227,35 @@ class RoomTest {
         // then
         assertThat(room.getWinningMenu()).isEqualTo("삼겹살"); // 점수와 Like 수 동점 시 인덱스가 더 앞선 삼겹살 당선
     }
+
+    @Test
+    @DisplayName("방장이 설정한 동적 스와이프 카드 개수(⚡ 5장 초고속 모드)에 도달하면 투표 완료 및 결과 도출이 성공한다")
+    void determineWinningMenu_dynamic_max_swipe_count() {
+        // given
+        Room expressRoom = Room.builder()
+                .id("ROOM-EXPRESS")
+                .hostId(hostId)
+                .location("회기역")
+                .maxSwipeCount(5) // 5장 초고속 모드 설정!
+                .build();
+
+        UUID user1 = UUID.randomUUID();
+        expressRoom.joinMember(Member.builder().id(user1).nickname("유저1").build());
+        expressRoom.startVoting(hostId);
+
+        // 5가지 메뉴에 대해서만 스와이프 진행
+        for (int i = 0; i < 5; i++) {
+            expressRoom.swipeMenu(user1, DefaultMenus.MENUS.get(i), true);
+        }
+
+        // then
+        assertThat(expressRoom.isAllMembersCompletedSwiping()).isTrue(); // 5장만 밀었어도 전체 완료로 판정!
+
+        // when
+        expressRoom.determineWinningMenu();
+
+        // then
+        assertThat(expressRoom.getStatus()).isEqualTo(RoomStatus.COMPLETED);
+        assertThat(expressRoom.getWinningMenu()).isEqualTo("삼겹살"); // 첫 번째 메뉴인 삼겹살 당선!
+    }
 }

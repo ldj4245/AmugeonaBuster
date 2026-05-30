@@ -53,7 +53,7 @@ class RoomServiceTest {
     @DisplayName("방장 닉네임과 약속 장소를 받아 방을 성공적으로 개설하고 저장한다")
     void createRoom_success() {
         // given
-        CreateRoomCommand command = new CreateRoomCommand("김방장", "강남역");
+        CreateRoomCommand command = new CreateRoomCommand("김방장", "강남역", 15);
 
         // when
         Room room = roomService.createRoom(command);

@@ -49,6 +49,7 @@ public class RoomService implements CreateRoomUseCase, JoinRoomUseCase, StartVot
                 .id(roomId)
                 .hostId(hostId)
                 .location(command.getLocation())
+                .maxSwipeCount(command.getMaxSwipeCount())
                 .build();
 
         room.joinMember(host);

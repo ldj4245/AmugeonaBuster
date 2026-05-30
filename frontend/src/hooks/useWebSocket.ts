@@ -22,6 +22,7 @@ export interface WebSocketRoomResponse {
   defaultMenus: string[];
   totalMembers: number;
   completedMembersCount: number;
+  maxSwipeCount: number;
   voteStats?: Array<{
     menuName: string;
     likes: number;

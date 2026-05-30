@@ -19,8 +19,9 @@ public interface CreateRoomUseCase {
     class CreateRoomCommand {
         private final String hostNickname;
         private final String location;
+        private final int maxSwipeCount;
 
-        public CreateRoomCommand(String hostNickname, String location) {
+        public CreateRoomCommand(String hostNickname, String location, int maxSwipeCount) {
             this.hostNickname = Objects.requireNonNull(hostNickname, "방장 닉네임은 필수입니다.");
             if (hostNickname.trim().isEmpty()) {
                 throw new IllegalArgumentException("방장 닉네임은 공백일 수 없습니다.");
@@ -29,6 +30,7 @@ public interface CreateRoomUseCase {
             if (location.trim().isEmpty()) {
                 throw new IllegalArgumentException("약속 장소는 공백일 수 없습니다.");
             }
+            this.maxSwipeCount = maxSwipeCount != 0 ? maxSwipeCount : 15;
         }
     }
 }

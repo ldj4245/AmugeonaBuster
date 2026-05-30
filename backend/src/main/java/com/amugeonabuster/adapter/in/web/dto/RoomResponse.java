@@ -26,6 +26,7 @@ public class RoomResponse {
     private final int totalMembers;
     private final int completedMembersCount;
     private final List<MenuVoteStat> voteStats;
+    private final int maxSwipeCount;
 
     @Getter
     @Builder
@@ -56,7 +57,7 @@ public class RoomResponse {
                 .collect(Collectors.toList());
 
         // 각 멤버별 스와이프 완료 여부를 집계하여 완료자 인원수 계산
-        int targetMenuCount = DefaultMenus.MENUS.size();
+        int targetMenuCount = room.getMaxSwipeCount();
         long completedCount = room.getMembers().stream()
                 .filter(m -> {
                     long uniqueSwiped = room.getSwipes().stream()
@@ -68,8 +69,8 @@ public class RoomResponse {
                 })
                 .count();
 
-        // 메뉴별 투표 통계 집계 (좋아요/싫어요)
-        List<MenuVoteStat> voteStats = DefaultMenus.MENUS.stream()
+        // 메뉴별 투표 통계 집계 (좋아요/싫어요) - 활성화된 서브리스트만 집계
+        List<MenuVoteStat> voteStats = DefaultMenus.MENUS.subList(0, room.getMaxSwipeCount()).stream()
                 .map(menu -> {
                     long likes = room.getSwipes().stream()
                             .filter(s -> s.getMenuName().equals(menu) && s.isLike())
@@ -95,10 +96,11 @@ public class RoomResponse {
                 .members(memberResponses)
                 .winningMenu(room.getWinningMenu())
                 .matchedRestaurants(restaurantResponses)
-                .defaultMenus(DefaultMenus.MENUS)
+                .defaultMenus(DefaultMenus.MENUS.subList(0, room.getMaxSwipeCount()))
                 .totalMembers(room.getMembers().size())
                 .completedMembersCount((int) completedCount)
                 .voteStats(voteStats)
+                .maxSwipeCount(room.getMaxSwipeCount())
                 .build();
     }
 }

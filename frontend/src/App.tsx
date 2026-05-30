@@ -34,6 +34,7 @@ function App() {
   const [location, setLocation] = useState('');
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [isJoinView, setIsJoinView] = useState(false);
+  const [maxSwipeCount, setMaxSwipeCount] = useState(15);
   
   // 게임 세션 관련 정보
   const [roomId, setRoomId] = useState<string | null>(null);
@@ -80,7 +81,7 @@ function App() {
       const response = await fetch(BASE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hostNickname: nickname, location })
+        body: JSON.stringify({ hostNickname: nickname, location, maxSwipeCount })
       });
 
       if (!response.ok) {
@@ -380,6 +381,30 @@ function App() {
                     </div>
                   </div>
 
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-zinc-600 px-1">투표 카드 개수</label>
+                    <div className="grid grid-cols-3 gap-2 bg-zinc-50 p-1 rounded-lg border border-zinc-200">
+                      {[
+                        { label: '⚡ 5장 (초고속)', value: 5 },
+                        { label: '🥣 10장 (일반)', value: 10 },
+                        { label: '🥩 15장 (진심)', value: 15 }
+                      ].map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setMaxSwipeCount(opt.value)}
+                          className={`py-2 text-[11px] font-medium rounded-md transition-all ${
+                            maxSwipeCount === opt.value
+                              ? 'bg-orange-500 text-white shadow-sm font-bold'
+                              : 'text-zinc-500 hover:text-zinc-700'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <button
                     type="submit"
                     disabled={loading}
@@ -561,7 +586,7 @@ function App() {
                 <span className="text-zinc-800 text-sm font-medium">먹고 싶은 메뉴를 선택하세요</span>
               </div>
               <div className="bg-zinc-100 text-zinc-600 px-3 py-1.5 rounded-lg text-xs font-medium">
-                {swipeCount} / 15
+                {swipeCount} / {roomState.maxSwipeCount}
               </div>
             </div>
 
@@ -587,7 +612,7 @@ function App() {
 
             {/* Tinder Cards Stack Container */}
             <div className="relative w-full h-[400px] flex justify-center items-center">
-              {swipeCount >= 15 ? (
+              {swipeCount >= roomState.maxSwipeCount ? (
                 /* ALL SWIPED LOCAL WAITING */
                 <div className="w-full h-full bg-white border border-zinc-200 shadow-sm rounded-xl p-8 flex flex-col justify-center items-center text-center gap-4">
                   <div className="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500">
@@ -626,7 +651,7 @@ function App() {
                             {meta.category}
                           </span>
                           <span className="text-white/50 text-xs font-mono">
-                            {originalIndex + 1} / 15
+                            {originalIndex + 1} / {roomState.maxSwipeCount}
                           </span>
                         </div>
 
