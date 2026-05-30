@@ -1,6 +1,7 @@
 package com.amugeonabuster.application.service;
 
 import com.amugeonabuster.application.port.in.CreateRoomUseCase;
+import com.amugeonabuster.application.port.in.GetRoomUseCase;
 import com.amugeonabuster.application.port.in.JoinRoomUseCase;
 import com.amugeonabuster.application.port.in.StartVotingUseCase;
 import com.amugeonabuster.application.port.in.SwipeMenuUseCase;
@@ -17,12 +18,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class RoomService implements CreateRoomUseCase, JoinRoomUseCase, StartVotingUseCase, SwipeMenuUseCase {
+public class RoomService implements CreateRoomUseCase, GetRoomUseCase, JoinRoomUseCase, StartVotingUseCase, SwipeMenuUseCase {
 
     private final SaveRoomPort saveRoomPort;
     private final LoadRoomPort loadRoomPort;
@@ -120,6 +122,11 @@ public class RoomService implements CreateRoomUseCase, JoinRoomUseCase, StartVot
         saveRoomPort.saveRoom(room);
 
         return room;
+    }
+
+    @Override
+    public Optional<Room> getRoom(String roomId) {
+        return loadRoomPort.loadRoom(roomId);
     }
 
     /**

@@ -55,8 +55,31 @@ function App() {
     const urlParams = new URLSearchParams(window.location.search);
     const roomCode = urlParams.get('room');
     if (roomCode) {
-      setRoomCodeInput(roomCode);
+      const formattedCode = roomCode.trim().toUpperCase();
+      setRoomCodeInput(formattedCode);
       setIsJoinView(true);
+
+      // 방의 현재 매칭 상태를 백엔드에서 미리 비동기로 조회해봅니다.
+      setLoading(true);
+      fetch(`${BASE_URL}/${formattedCode}`)
+        .then(async (res) => {
+          if (res.ok) {
+            const data = await res.json();
+            console.log('📬 Loaded shared room state on mount:', data);
+            
+            // 만약 방이 이미 완료(COMPLETED)된 상태라면, 참여 과정을 생략하고 결과 창을 즉시 노출합니다!
+            if (data.status === 'COMPLETED') {
+              setRoomId(data.roomId);
+              setRoomState(data);
+            }
+          }
+        })
+        .catch(err => {
+          console.error('Failed to pre-fetch room state:', err);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
     }
   }, []);
 
