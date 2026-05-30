@@ -144,11 +144,110 @@ function App() {
   const [menuDetailCotNo, setMenuDetailCotNo] = useState('');
   const [menuDetailHallNo, setMenuDetailHallNo] = useState('');
 
+  // 🎮 커피빵 내기 미니게임 관련 상태 변수
+  const [menuDetailTab, setMenuDetailTab] = useState<'menu' | 'game'>('menu');
+  const [playerCount, setPlayerCount] = useState(4);
+  const [cupStates, setCupStates] = useState<{ flipped: boolean; isSalt: boolean }[]>([]);
+  const [gameStatus, setGameStatus] = useState<'ready' | 'playing' | 'gameover'>('ready');
+  const [looserName, setLooserName] = useState('');
+  const [showReceipt, setShowReceipt] = useState(false);
+
+  // 커피 내기 게임 컵 랜덤 셔플 초기화
+  const initCoffeeGame = (count: number) => {
+    const saltIdx = Math.floor(Math.random() * count);
+    const initialCups = Array.from({ length: count }, (_, idx) => ({
+      flipped: false,
+      isSalt: idx === saltIdx
+    }));
+    setCupStates(initialCups);
+    setGameStatus('playing');
+    setLooserName('');
+    setShowReceipt(false);
+  };
+
+  // 사운드 재생 헬퍼
+  const playAudio = (url: string) => {
+    try {
+      const audio = new Audio(url);
+      audio.volume = 0.4;
+      audio.play();
+    } catch (err) {
+      console.warn("Audio play blocked by browser policy:", err);
+    }
+  };
+
+  // 컵 터치 이벤트 처리
+  const handleCupClick = (idx: number) => {
+    if (gameStatus !== 'playing' || cupStates[idx].flipped) return;
+
+    const nextCups = [...cupStates];
+    nextCups[idx].flipped = true;
+    setCupStates(nextCups);
+
+    if (nextCups[idx].isSalt) {
+      setGameStatus('gameover');
+      // 꽝 효과음
+      playAudio('https://assets.mixkit.co/active_storage/sfx/2869/2869-200.wav');
+      // 모바일 기기 진동 API 연동 (vibrate)
+      if (navigator.vibrate) {
+        navigator.vibrate([200, 100, 200, 100, 300]);
+      }
+    } else {
+      // 커피 드립 효과음
+      playAudio('https://assets.mixkit.co/active_storage/sfx/2452/2452-200.wav');
+    }
+  };
+
+  // 카카오톡 단톡방 골든벨 박제 공유 처리
+  const handleKakaoShareReceipt = () => {
+    const shareText = `[🚨 커피 골든벨 속보]\n오늘의 썩은 소금 아메리카노 당첨자는 바로 [${looserName}]님입니다! 🔔💸\n\n품명: 소금 아메리카노 1잔 (시가 ₩55,000)\n\n"오늘 커피는 ${looserName}님이 시원하게 쏘십니다! 다들 감사한 마음으로 카페로 집결하세요! 😍☕"\n\n👉 지금 나도 내기 참여하기: ${window.location.origin}/?view-menu=true&cotNo=${menuDetailCotNo}&hallNo=${menuDetailHallNo}&name=${encodeURIComponent(menuDetailCafeteriaName)}`;
+
+    const k = (window as any).Kakao;
+    if (k && k.isInitialized && k.isInitialized()) {
+      try {
+        k.Share.sendDefault({
+          objectType: 'feed',
+          content: {
+            title: '🚨 커피 골든벨 당첨 안내',
+            description: `오늘의 커피빵 주인공은 [${looserName}]님입니다! 🔔💸`,
+            imageUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=500',
+            link: {
+              mobileWebUrl: window.location.href,
+              webUrl: window.location.href,
+            },
+          },
+          buttons: [
+            {
+              title: '나도 내기 참여하기 🎮',
+              link: {
+                mobileWebUrl: window.location.href,
+                webUrl: window.location.href,
+              },
+            },
+          ],
+        });
+        alert('카카오톡으로 골든벨 소식이 전송되었습니다! 📢');
+        return;
+      } catch (err) {
+        console.error('Kakao share default failed, falling back to clipboard:', err);
+      }
+    }
+
+    // 폴백: 클립보드 복사
+    navigator.clipboard.writeText(shareText).then(() => {
+      alert('📢 골든벨 당첨 명단과 복불복 영수증 텍스트가 클립보드에 복사되었습니다! 카톡 단톡방에 붙여넣기(Ctrl+V)해서 당첨자를 박제하세요! 💸');
+    }).catch(err => {
+      console.error('Clipboard copy failed:', err);
+      alert(`[결과] 오늘 커피 쏠 사람: ${looserName}님!`);
+    });
+  };
+
   // 실시간 식단 상세 조회 API 핸들러
   const triggerFetchMenuDetails = async (cotNo: string, hallNo: string, name: string) => {
     setMenuDetailLoading(true);
     setMenuDetailError(null);
     setIsMenuDetailOpen(true);
+    setMenuDetailTab('menu');
     setMenuDetailCafeteriaName(name);
     setMenuDetailCotNo(cotNo);
     setMenuDetailHallNo(hallNo);
@@ -1828,188 +1927,415 @@ function App() {
               </p>
             </div>
 
-            {/* 2. 로딩 상태 */}
-            {menuDetailLoading && (
-              <div className="flex flex-col items-center justify-center py-24 px-6 gap-5 text-center flex-grow">
-                <RefreshCw className="w-10 h-10 animate-spin text-orange-500" />
-                <div className="flex flex-col gap-1.5">
-                  <h4 className="font-bold text-zinc-800 text-base">실시간 식단 데이터 수집 중</h4>
-                  <p className="text-xs text-zinc-500 max-w-sm leading-relaxed">
-                    삼성 웰스토리 플러스의 실시간 코너 정보를 가공하여 최상의 가독성으로 변환 중입니다. 잠시만 기다려 주세요!
-                  </p>
-                </div>
-              </div>
-            )}
+            {/* 2. 모던 탭 컨트롤 바 */}
+            <div className="bg-white border-b border-zinc-200 p-2 shrink-0 flex gap-2">
+              <button 
+                onClick={() => setMenuDetailTab('menu')}
+                className={`flex-1 py-3 px-4 rounded-2xl font-black text-xs sm:text-sm transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer select-none ${
+                  menuDetailTab === 'menu' 
+                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md shadow-orange-500/20' 
+                    : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-500 border border-zinc-200/50'
+                }`}
+              >
+                🍱 오늘의 식단 전체보기
+              </button>
+              <button 
+                onClick={() => {
+                  setMenuDetailTab('game');
+                  initCoffeeGame(playerCount);
+                }}
+                className={`flex-1 py-3 px-4 rounded-2xl font-black text-xs sm:text-sm transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer select-none ${
+                  menuDetailTab === 'game' 
+                    ? 'bg-gradient-to-r from-rose-500 to-red-500 text-white shadow-md shadow-red-500/20' 
+                    : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-500 border border-zinc-200/50'
+                }`}
+              >
+                🔥 커피빵 복불복 내기
+              </button>
+            </div>
 
-            {/* 3. 에러 발생 상태 */}
-            {menuDetailError && (
-              <div className="flex flex-col items-center justify-center py-20 px-6 gap-6 text-center max-w-md mx-auto flex-grow">
-                <div className="w-16 h-16 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-500 shadow-sm border border-rose-100">
-                  <AlertCircle className="w-8 h-8" />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <h4 className="font-bold text-zinc-800 text-base">식단 정보를 가져올 수 없습니다</h4>
-                  <p className="text-xs text-rose-600 leading-relaxed font-semibold">{menuDetailError}</p>
-                </div>
-                <div className="flex gap-3 w-full">
-                  <button
-                    onClick={() => triggerFetchMenuDetails(menuDetailCotNo, menuDetailHallNo, menuDetailCafeteriaName)}
-                    className="flex-1 py-3.5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl transition-all text-xs cursor-pointer shadow-md"
-                  >
-                    새로고침 🔄
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsMenuDetailOpen(false);
-                      setIsWelstoryModalOpen(true);
-                    }}
-                    className="flex-1 py-3.5 bg-zinc-800 hover:bg-zinc-900 text-white font-bold rounded-xl transition-all text-xs cursor-pointer shadow-sm"
-                  >
-                    지점 변경 ⚙️
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* 3. 오늘의 식단 탭 화면 */}
+            {menuDetailTab === 'menu' && (
+              <>
+                {/* 2. 로딩 상태 */}
+                {menuDetailLoading && (
+                  <div className="flex flex-col items-center justify-center py-24 px-6 gap-5 text-center flex-grow">
+                    <RefreshCw className="w-10 h-10 animate-spin text-orange-500" />
+                    <div className="flex flex-col gap-1.5">
+                      <h4 className="font-bold text-zinc-800 text-base">실시간 식단 데이터 수집 중</h4>
+                      <p className="text-xs text-zinc-500 max-w-sm leading-relaxed">
+                        삼성 웰스토리 플러스의 실시간 코너 정보를 가공하여 최상의 가독성으로 변환 중입니다. 잠시만 기다려 주세요!
+                      </p>
+                    </div>
+                  </div>
+                )}
 
-            {/* 4. 데이터가 존재하지 않는 경우 */}
-            {!menuDetailLoading && !menuDetailError && menuDetailCourses.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-24 px-6 gap-5 text-center flex-grow">
-                <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 border border-amber-100">
-                  <Info className="w-8 h-8" />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <h4 className="font-bold text-zinc-800 text-base">오늘 등록된 식단이 없습니다</h4>
-                  <p className="text-xs text-zinc-500 max-w-xs leading-relaxed">
-                    주말/공휴일이거나 해당 식당 지점의 식단 등록이 완료되지 않았습니다. 설정에서 지점을 변경해 보세요!
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    setIsMenuDetailOpen(false);
-                    setIsWelstoryModalOpen(true);
-                  }}
-                  className="mt-2 py-2.5 px-5 bg-zinc-800 hover:bg-zinc-900 text-white font-bold rounded-xl transition-colors text-xs cursor-pointer shadow-sm"
-                >
-                  구내식당 지점 변경하러 가기 ⚙️
-                </button>
-              </div>
-            )}
-
-            {/* 5. 정상 식단 목록 (스크롤) */}
-            {!menuDetailLoading && !menuDetailError && menuDetailCourses.length > 0 && (
-              <div className="overflow-y-auto p-5 sm:p-8 flex-grow bg-slate-50/50">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {menuDetailCourses.map((course: any, idx: number) => {
-                    const { badgeGradient, courseEmoji } = getCourseStyle(course.courseName);
-                    
-                    // Comma로 나열된 반찬 메뉴 상세 파싱
-                    const dishes = course.menuDetails
-                      ? course.menuDetails.split(',').map((d: string) => d.trim()).filter((d: string) => d.length > 0)
-                      : [];
-                    
-                    const mainDish = dishes[0] || '식단 준비 중';
-                    const sideDishes = dishes.slice(1);
-                    
-                    // 칼로리 게이지 바 비율 및 스타일 계산
-                    const caloriePercentage = Math.min(100, Math.max(10, (course.calories / 1200) * 100));
-                    const calorieColorClass = course.calories < 600 
-                      ? 'bg-emerald-500' 
-                      : course.calories < 850 
-                        ? 'bg-orange-500' 
-                        : 'bg-rose-500';
-
-                    return (
-                      <div 
-                        key={idx} 
-                        className="relative bg-white border border-zinc-200 hover:border-orange-300 rounded-3xl p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between gap-5 overflow-hidden group"
+                {/* 3. 에러 발생 상태 */}
+                {menuDetailError && (
+                  <div className="flex flex-col items-center justify-center py-20 px-6 gap-6 text-center max-w-md mx-auto flex-grow">
+                    <div className="w-16 h-16 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-500 shadow-sm border border-rose-100">
+                      <AlertCircle className="w-8 h-8" />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <h4 className="font-bold text-zinc-800 text-base">식단 정보를 가져올 수 없습니다</h4>
+                      <p className="text-xs text-rose-600 leading-relaxed font-semibold">{menuDetailError}</p>
+                    </div>
+                    <div className="flex gap-3 w-full">
+                      <button
+                        onClick={() => triggerFetchMenuDetails(menuDetailCotNo, menuDetailHallNo, menuDetailCafeteriaName)}
+                        className="flex-1 py-3.5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl transition-all text-xs cursor-pointer shadow-md"
                       >
-                        {/* 최상단 코너 그라데이션 장식 선 */}
-                        <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${badgeGradient}`} />
+                        새로고침 🔄
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsMenuDetailOpen(false);
+                          setIsWelstoryModalOpen(true);
+                        }}
+                        className="flex-1 py-3.5 bg-zinc-800 hover:bg-zinc-900 text-white font-bold rounded-xl transition-all text-xs cursor-pointer shadow-sm"
+                      >
+                        지점 변경 ⚙️
+                      </button>
+                    </div>
+                  </div>
+                )}
 
-                        <div className="flex flex-col gap-4">
-                          {/* 코너 타이틀 배지 및 가격 정보 */}
-                          <div className="flex items-center justify-between gap-2">
-                            <span className={`text-xs font-black tracking-tight text-white bg-gradient-to-r ${badgeGradient} px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm`}>
-                              <span>{courseEmoji}</span>
-                              {course.courseName}
-                            </span>
-                            {course.price && (
-                              <span className="text-xs font-bold text-zinc-600 bg-zinc-100/80 border border-zinc-200/40 px-3 py-1.5 rounded-xl font-mono shadow-xs">
-                                💰 {course.price}
-                              </span>
-                            )}
-                          </div>
+                {/* 4. 데이터가 존재하지 않는 경우 */}
+                {!menuDetailLoading && !menuDetailError && menuDetailCourses.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-24 px-6 gap-5 text-center flex-grow">
+                    <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 border border-amber-100">
+                      <Info className="w-8 h-8" />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <h4 className="font-bold text-zinc-800 text-base">오늘 등록된 식단이 없습니다</h4>
+                      <p className="text-xs text-zinc-500 max-w-xs leading-relaxed">
+                        주말/공휴일이거나 해당 식당 지점의 식단 등록이 완료되지 않았습니다. 설정에서 지점을 변경해 보세요!
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setIsMenuDetailOpen(false);
+                        setIsWelstoryModalOpen(true);
+                      }}
+                      className="mt-2 py-2.5 px-5 bg-zinc-800 hover:bg-zinc-900 text-white font-bold rounded-xl transition-colors text-xs cursor-pointer shadow-sm"
+                    >
+                      구내식당 지점 변경하러 가기 ⚙️
+                    </button>
+                  </div>
+                )}
 
-                          {/* 프리미엄 썸네일 비주얼 (Unsplash Fallback 및 실시간 이미지 융합) */}
-                          <div className="relative w-full h-44 rounded-2xl overflow-hidden bg-zinc-100 shadow-inner border border-zinc-100">
-                            <img 
-                              src={getCourseImage(course.courseName, course.imageUrl)} 
-                              alt={course.courseName} 
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                              onError={(e) => {
-                                // 이미지 로딩 실패 시 Unsplash 테마 이미지로 강제 복구해 완성도를 높임
-                                e.currentTarget.src = getCourseImage(course.courseName);
-                              }}
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent pointer-events-none" />
-                          </div>
+                {/* 5. 정상 식단 목록 (스크롤) */}
+                {!menuDetailLoading && !menuDetailError && menuDetailCourses.length > 0 && (
+                  <div className="overflow-y-auto p-5 sm:p-8 flex-grow bg-slate-50/50">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {menuDetailCourses.map((course: any, idx: number) => {
+                        const { badgeGradient, courseEmoji } = getCourseStyle(course.courseName);
+                        
+                        const dishes = course.menuDetails
+                          ? course.menuDetails.split(',').map((d: string) => d.trim()).filter((d: string) => d.length > 0)
+                          : [];
+                        
+                        const mainDish = dishes[0] || '식단 준비 중';
+                        const sideDishes = dishes.slice(1);
+                        
+                        const caloriePercentage = Math.min(100, Math.max(10, (course.calories / 1200) * 100));
+                        const calorieColorClass = course.calories < 600 
+                          ? 'bg-emerald-500' 
+                          : course.calories < 850 
+                            ? 'bg-orange-500' 
+                            : 'bg-rose-500';
 
-                          {/* 직관적인 한눈에 보는 메뉴판 리스트 */}
-                          <div className="flex flex-col gap-3.5">
-                            {/* 메인 메뉴 하이라이팅 */}
-                            <div className="bg-orange-50/50 border border-orange-100/50 p-3.5 rounded-2xl">
-                              <span className="text-[9px] font-black text-orange-500 bg-orange-100/60 px-2 py-0.5 rounded-md uppercase tracking-wider block w-fit mb-1.5">
-                                👑 오늘의 메인 요리
-                              </span>
-                              <h4 className="text-sm font-black text-zinc-800 leading-snug">
-                                {mainDish}
-                              </h4>
+                        return (
+                          <div 
+                            key={idx} 
+                            className="relative bg-white border border-zinc-200 hover:border-orange-300 rounded-3xl p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between gap-5 overflow-hidden group"
+                          >
+                            <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${badgeGradient}`} />
+
+                            <div className="flex flex-col gap-4">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className={`text-xs font-black tracking-tight text-white bg-gradient-to-r ${badgeGradient} px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm`}>
+                                  <span>{courseEmoji}</span>
+                                  {course.courseName}
+                                </span>
+                                {course.price && (
+                                  <span className="text-xs font-bold text-zinc-600 bg-zinc-100/80 border border-zinc-200/40 px-3 py-1.5 rounded-xl font-mono shadow-xs">
+                                    💰 {course.price}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="relative w-full h-44 rounded-2xl overflow-hidden bg-zinc-100 shadow-inner border border-zinc-100">
+                                <img 
+                                  src={getCourseImage(course.courseName, course.imageUrl)} 
+                                  alt={course.courseName} 
+                                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                                  onError={(e) => {
+                                    e.currentTarget.src = getCourseImage(course.courseName);
+                                  }}
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent pointer-events-none" />
+                              </div>
+
+                              <div className="flex flex-col gap-3.5">
+                                <div className="bg-orange-50/50 border border-orange-100/50 p-3.5 rounded-2xl">
+                                  <span className="text-[9px] font-black text-orange-500 bg-orange-100/60 px-2 py-0.5 rounded-md uppercase tracking-wider block w-fit mb-1.5">
+                                    👑 오늘의 메인 요리
+                                  </span>
+                                  <h4 className="text-sm font-black text-zinc-800 leading-snug">
+                                    {mainDish}
+                                  </h4>
+                                </div>
+
+                                {sideDishes.length > 0 && (
+                                  <div className="flex flex-col gap-2 px-1">
+                                    <span className="text-[10px] font-extrabold text-zinc-400 uppercase tracking-wider block mb-1">
+                                      🥗 함께 제공되는 찬류 및 사이드
+                                    </span>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                                      {sideDishes.map((side: string, sIdx: number) => (
+                                        <div key={sIdx} className="flex items-center gap-2 text-xs font-bold text-zinc-600">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0 shadow-xs" />
+                                          <span className="truncate" title={side}>{side}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
 
-                            {/* 사이드/반찬 리스트 그리드 */}
-                            {sideDishes.length > 0 && (
-                              <div className="flex flex-col gap-2 px-1">
-                                <span className="text-[10px] font-extrabold text-zinc-400 uppercase tracking-wider block mb-1">
-                                  🥗 함께 제공되는 찬류 및 사이드
-                                </span>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
-                                  {sideDishes.map((side: string, sIdx: number) => (
-                                    <div key={sIdx} className="flex items-center gap-2 text-xs font-bold text-zinc-600">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0 shadow-xs" />
-                                      <span className="truncate" title={side}>{side}</span>
-                                    </div>
-                                  ))}
+                            {course.calories > 0 && (
+                              <div className="border-t border-zinc-100 pt-4 flex flex-col gap-1.5">
+                                <div className="flex items-center justify-between text-[11px] font-black text-zinc-400">
+                                  <span className="flex items-center gap-1">🔥 총 칼로리</span>
+                                  <span className="font-mono text-zinc-700 text-xs font-bold">{course.calories} kcal</span>
+                                </div>
+                                <div className="w-full h-2.5 bg-zinc-100 rounded-full overflow-hidden shadow-inner relative">
+                                  <div 
+                                    className={`h-full rounded-full transition-all duration-500 ${calorieColorClass}`} 
+                                    style={{ width: `${caloriePercentage}%` }}
+                                  />
                                 </div>
                               </div>
                             )}
                           </div>
-                        </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
 
-                        {/* 칼로리 게이지 바 */}
-                        {course.calories > 0 && (
-                          <div className="border-t border-zinc-100 pt-4 flex flex-col gap-1.5">
-                            <div className="flex items-center justify-between text-[11px] font-black text-zinc-400">
-                              <span className="flex items-center gap-1">🔥 총 칼로리</span>
-                              <span className="font-mono text-zinc-700 text-xs font-bold">{course.calories} kcal</span>
+            {/* 4. 커피빵 내기 탭 화면 */}
+            {menuDetailTab === 'game' && (
+              <div className="overflow-y-auto p-5 sm:p-8 flex-grow bg-slate-50/50 flex flex-col items-center justify-start gap-6 select-none">
+                {/* A. 상단 컨트롤 패널 */}
+                <div className="w-full max-w-md bg-white border border-zinc-200/80 p-5 rounded-3xl shadow-sm flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs sm:text-sm font-black text-zinc-700 flex items-center gap-1.5">
+                      👥 내기 참여 인원
+                    </span>
+                    <span className="text-sm sm:text-base font-black text-rose-500 font-mono bg-rose-50 px-3 py-1 rounded-xl">
+                      {playerCount}명
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button 
+                      onClick={() => {
+                        const val = Math.max(3, playerCount - 1);
+                        setPlayerCount(val);
+                        initCoffeeGame(val);
+                      }}
+                      className="w-10 h-10 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200/50 text-zinc-600 font-black text-lg flex items-center justify-center cursor-pointer select-none"
+                    >
+                      -
+                    </button>
+                    <input 
+                      type="range" 
+                      min="3" 
+                      max="8" 
+                      value={playerCount} 
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        setPlayerCount(val);
+                        initCoffeeGame(val);
+                      }}
+                      className="flex-grow h-2 bg-zinc-100 rounded-lg appearance-none cursor-pointer accent-rose-500"
+                    />
+                    <button 
+                      onClick={() => {
+                        const val = Math.min(8, playerCount + 1);
+                        setPlayerCount(val);
+                        initCoffeeGame(val);
+                      }}
+                      className="w-10 h-10 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200/50 text-zinc-600 font-black text-lg flex items-center justify-center cursor-pointer select-none"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <button 
+                    onClick={() => initCoffeeGame(playerCount)}
+                    className="w-full py-3 bg-rose-500 hover:bg-rose-600 text-white font-black text-xs rounded-2xl transition-all shadow-md shadow-rose-500/20 cursor-pointer"
+                  >
+                    🔄 컵 다시 섞기
+                  </button>
+                </div>
+
+                {/* B. 게임 플레이 영역 */}
+                {gameStatus === 'playing' && (
+                  <div className="w-full max-w-lg mt-2 animate-slide-up">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 justify-items-center">
+                      {cupStates.map((cup, idx) => (
+                        <div 
+                          key={idx}
+                          onClick={() => handleCupClick(idx)}
+                          className="relative w-20 h-24 sm:w-24 sm:h-28 cursor-pointer [perspective:1000px] group select-none"
+                        >
+                          <div 
+                            className={`relative w-full h-full rounded-2xl transition-transform duration-500 [transform-style:preserve-3d] shadow-sm ${
+                              cup.flipped ? '[transform:rotateY(180deg)]' : 'group-hover:scale-105'
+                            }`}
+                          >
+                            {/* 컵 앞면 (엎어져 있는 상태) */}
+                            <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700 rounded-2xl flex flex-col items-center justify-center gap-1 backface-hidden text-white">
+                              <span className="text-xl sm:text-2xl animate-pulse">☕</span>
+                              <span className="text-[10px] font-black font-mono text-zinc-400">CUP {idx + 1}</span>
                             </div>
-                            <div className="w-full h-2.5 bg-zinc-100 rounded-full overflow-hidden shadow-inner relative">
-                              <div 
-                                className={`h-full rounded-full transition-all duration-500 ${calorieColorClass}`} 
-                                style={{ width: `${caloriePercentage}%` }}
-                              />
+
+                            {/* 컵 뒷면 (뒤집힌 상태 - 커피 또는 소금) */}
+                            <div className={`absolute inset-0 border rounded-2xl flex flex-col items-center justify-center [transform:rotateY(180deg)] backface-hidden ${
+                              cup.isSalt 
+                                ? 'bg-gradient-to-br from-red-50 to-rose-100 border-red-300 text-red-500' 
+                                : 'bg-gradient-to-br from-amber-50 to-orange-100 border-orange-300 text-amber-800'
+                            }`}>
+                              {cup.isSalt ? (
+                                <>
+                                  <span className="text-3xl animate-bounce">💀🧂</span>
+                                  <span className="text-[9px] font-black text-red-600 bg-red-100 px-1.5 py-0.5 rounded-md mt-1 font-mono">폭탄 당첨</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-2xl">☕✨</span>
+                                  <span className="text-[9px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-md mt-1 font-mono">SAFE</span>
+                                </>
+                              )}
                             </div>
                           </div>
-                        )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* C. 꽝 발생: 당첨자 이름 입력 화면 */}
+                {gameStatus === 'gameover' && !showReceipt && (
+                  <div className="w-full max-w-md bg-white border border-rose-100 p-6 rounded-3xl shadow-xl flex flex-col items-center gap-5 text-center border-t-4 border-t-rose-500 animate-slide-up mt-2">
+                    <span className="text-5xl animate-bounce">💀🧂</span>
+                    <div className="flex flex-col gap-1.5">
+                      <h4 className="text-base font-black text-zinc-800">소금 폭탄 아메리카노 당첨!</h4>
+                      <p className="text-xs text-zinc-500 font-medium">영광의 커피 골든벨을 울릴 주인공의 성함/닉네임을 입력하세요.</p>
+                    </div>
+                    <input 
+                      type="text" 
+                      value={looserName} 
+                      onChange={(e) => setLooserName(e.target.value)}
+                      placeholder="예: 홍대리, 김과장"
+                      maxLength={10}
+                      className="w-full px-4 py-3 border border-zinc-200 focus:border-rose-500 rounded-2xl font-bold text-center text-zinc-800 focus:outline-none shadow-sm transition-all"
+                    />
+                    <button 
+                      onClick={() => {
+                        if (!looserName.trim()) return;
+                        setShowReceipt(true);
+                        playAudio('https://assets.mixkit.co/active_storage/sfx/1657/1657-200.wav');
+                      }}
+                      disabled={!looserName.trim()}
+                      className="w-full py-3.5 bg-rose-500 hover:bg-rose-600 disabled:bg-zinc-300 text-white font-black text-xs rounded-2xl transition-all shadow-md cursor-pointer select-none"
+                    >
+                      🧾 골든벨 영수증 발급하기
+                    </button>
+                  </div>
+                )}
+
+                {/* D. 최종 골든벨 영수증 렌더링 */}
+                {gameStatus === 'gameover' && showReceipt && (
+                  <div className="w-full max-w-xs bg-white border-2 border-dashed border-zinc-300 p-6 rounded-3xl shadow-2xl flex flex-col gap-4 text-zinc-800 relative font-mono overflow-hidden animate-receipt-roll mt-2">
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-[repeating-linear-gradient(90deg,#000,#000_10px,transparent_10px,transparent_20px)] opacity-10" />
+                    
+                    <div className="text-center flex flex-col gap-1 border-b border-dashed border-zinc-300 pb-4">
+                      <h3 className="text-sm font-black tracking-widest text-zinc-800 uppercase">☕ [아무거나 커피숍] ☕</h3>
+                      <span className="text-[9px] font-bold text-zinc-400">AMUGEONA COFFEE SHOP (DSR BLDG)</span>
+                      <span className="text-[9px] font-bold text-zinc-400">TEL: 02-1234-5678</span>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5 text-[10px] font-bold border-b border-dashed border-zinc-300 pb-4">
+                      <div className="flex justify-between">
+                        <span>발행일시:</span>
+                        <span>{new Date().toISOString().replace('T', ' ').substring(0, 19)}</span>
                       </div>
-                    );
-                  })}
-                </div>
+                      <div className="flex justify-between">
+                        <span>주문번호:</span>
+                        <span># {Math.floor(Math.random() * 90000) + 10000}</span>
+                      </div>
+                      <div className="flex justify-between text-rose-500">
+                        <span>당첨구분:</span>
+                        <span>소금 커피 골든벨 당첨 🔔</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2.5 text-[10px] font-bold border-b border-dashed border-zinc-300 pb-4">
+                      <div className="flex justify-between text-zinc-400 font-extrabold text-[9px] uppercase">
+                        <span>상품명 [QTY]</span>
+                        <span>금액</span>
+                      </div>
+                      <div className="flex justify-between text-zinc-800">
+                        <span>💀 소금 아메리카노 [1]</span>
+                        <span>₩ 55,000</span>
+                      </div>
+                      <div className="flex justify-between text-zinc-800">
+                        <span>💖 동료들의 사랑/박수 [{playerCount - 1}]</span>
+                        <span>₩ 0 (Priceless)</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2 text-xs font-black pt-2 text-center">
+                      <div className="flex justify-between text-rose-600 border-b border-dashed border-zinc-200 pb-2">
+                        <span>최종 결제자:</span>
+                        <span>{looserName} 💸</span>
+                      </div>
+                      <p className="text-[10px] text-zinc-500 mt-2 font-black leading-relaxed">
+                        "오늘 커피는 {looserName}님이 시원하게 쏘십니다! 다들 감사히 잘 먹겠습니다! 😍☕"
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-zinc-200">
+                      <button 
+                        onClick={handleKakaoShareReceipt}
+                        className="w-full py-3 bg-[#FEE500] hover:bg-[#FDD000] text-zinc-900 font-black text-xs rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-xs"
+                      >
+                        💬 단톡방에 골든벨 박제하기
+                      </button>
+                      <button 
+                        onClick={() => initCoffeeGame(playerCount)}
+                        className="w-full py-3 bg-zinc-800 hover:bg-zinc-900 text-white font-black text-xs rounded-2xl cursor-pointer transition-colors shadow-xs"
+                      >
+                        🔄 한 판 더 하기!
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             {/* 6. 모달 하단 퀵 액션 */}
             <div className="bg-zinc-50/80 border-t border-zinc-200 p-4 shrink-0 flex items-center justify-between gap-4 text-xs font-bold text-zinc-500 sm:px-6">
-              <span>💡 카카오톡 식단 알림의 발송 시간, 수신 요일, 대상 식당 지점은 우측 상단의 설정(⚙️) 아이콘을 통해 언제든지 자유롭게 수정하실 수 있습니다.</span>
+              {menuDetailTab === 'menu' ? (
+                <span>💡 카카오톡 식단 알림의 발송 시간, 수신 요일, 대상 식당 지점은 우측 상단의 설정(⚙️) 아이콘을 통해 언제든지 자유롭게 수정하실 수 있습니다.</span>
+              ) : (
+                <span className="text-rose-500 flex items-center gap-1 font-black">⚡ 엎어진 커피컵들 중 소금 폭탄 아메리카노 💀가 숨겨져 있습니다! 한 명씩 터치하세요!</span>
+              )}
               <button 
                 onClick={() => setIsMenuDetailOpen(false)}
                 className="px-4 py-2 bg-zinc-800 hover:bg-zinc-900 text-white rounded-lg transition-colors cursor-pointer shrink-0"
