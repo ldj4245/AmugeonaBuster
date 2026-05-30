@@ -4,6 +4,9 @@ import TinderCard from 'react-tinder-card';
 import { useWebSocket, WebSocketRoomResponse } from './hooks/useWebSocket';
 import { KakaoMap } from './components/KakaoMap';
 const brandLogo = new URL('./amugeona_buster_logo.png', import.meta.url).href;
+const meal3dIcon = new URL('./meal_3d_icon.png', import.meta.url).href;
+const bell3dIcon = new URL('./bell_3d_icon.png', import.meta.url).href;
+const coffee3dIcon = new URL('./coffee_3d_icon.png', import.meta.url).href;
 
 // 메뉴 카테고리 정보 및 아이콘 정보 매핑
 const MENU_METADATA: Record<string, { emoji: string; category: string; description: string; gradient: string }> = {
@@ -960,10 +963,9 @@ function App() {
         {!roomId && (
           <button
             onClick={() => triggerFetchMenuDetails('WEL_DSR', 'HALL_01', '삼성 DSR 타워 웰스토리')}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white px-3.5 py-2 rounded-lg text-xs font-bold shadow-md transition-all scale-100 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+            className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white px-4 py-2 rounded-xl text-xs font-black shadow-sm transition-all scale-100 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            실시간 식단표 🍱
+            오늘의 식단표
           </button>
         )}
       </header>
@@ -993,26 +995,25 @@ function App() {
                 <span className="text-orange-500">스와이프 한 번이면 끝</span>
               </h1>
               <p className="text-zinc-500 text-sm sm:text-base max-w-md leading-relaxed mx-auto md:mx-0 font-medium">
-                더 이상 '아무거나'를 고민하며 시간 낭비하지 마세요. 스와이프 투표로 친구들과 오늘 최고의 메뉴를 찾고, 독립된 커피 내기 복불복 게임을 통해 즐거운 커피 타임을 완벽하게 결정해 드립니다. ☕🎰
+                더 이상 무엇을 먹을지 고민하며 방황하지 마세요. 스와이프 투표로 모두가 만족하는 최고의 메뉴를 결정하고, 커피 내기 복불복 게임을 통해 유쾌하게 골든벨 주인공을 가려드립니다.
               </p>
 
               {/* Feature Pills */}
               <div className="flex flex-wrap gap-3 mt-2 justify-center md:justify-start">
                 <div className="flex items-center gap-2 bg-white border border-zinc-200 px-4 py-2.5 rounded-lg text-sm text-zinc-700">
-                  <Users className="w-4 h-4 text-orange-500" />
+                  <Users className="w-4 h-4 text-zinc-400" />
                   실시간 대기실
                 </div>
                 <div className="flex items-center gap-2 bg-white border border-zinc-200 px-4 py-2.5 rounded-lg text-sm text-zinc-700">
-                  <Flame className="w-4 h-4 text-orange-500" />
+                  <Flame className="w-4 h-4 text-orange-400" />
                   스와이프 투표
                 </div>
                 <div className="flex items-center gap-2 bg-white border border-zinc-200 px-4 py-2.5 rounded-lg text-sm text-zinc-700">
-                  <Compass className="w-4 h-4 text-orange-500" />
+                  <Compass className="w-4 h-4 text-teal-400" />
                   맛집 매칭 지도
                 </div>
-                <div className="flex items-center gap-2 bg-white border border-orange-200 shadow-xs hover:border-rose-300 px-4 py-2.5 rounded-lg text-sm text-rose-600 font-black animate-pulse">
-                  <Sparkles className="w-4 h-4 text-rose-500 animate-spin-slow" />
-                  ☕ 커피빵 미니게임
+                <div className="flex items-center gap-2 bg-white border border-rose-200 shadow-xs hover:border-rose-300 px-4 py-2.5 rounded-lg text-sm text-rose-600 font-black">
+                  커피빵 미니게임
                 </div>
               </div>
             </div>
@@ -1243,8 +1244,8 @@ function App() {
             {/* 위젯 1: 실시간 식단표 */}
             <div className="bg-white border border-zinc-200 shadow-sm rounded-2xl p-6 flex flex-col justify-between gap-4 transition-all hover:shadow-md hover:border-orange-200">
               <div className="flex flex-col gap-2">
-                <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500 font-bold border border-orange-100">
-                  🍱
+                <div className="w-12 h-12 flex items-center justify-center">
+                  <img src={meal3dIcon} alt="Meal Icon" className="w-full h-full object-contain" />
                 </div>
                 <h3 className="font-bold text-zinc-800 text-base mt-2">오늘의 구내식당 식단표</h3>
                 <p className="text-xs text-zinc-500 leading-relaxed">
@@ -1254,17 +1255,17 @@ function App() {
               <button
                 type="button"
                 onClick={() => triggerFetchMenuDetails('WEL_DSR', 'HALL_01', '삼성 DSR 타워 웰스토리')}
-                className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center cursor-pointer"
               >
-                실시간 식단 보기 🍱
+                식단표 보기
               </button>
             </div>
 
             {/* 위젯 2: 스마트 카톡 식단 알림 */}
             <div className="bg-white border border-zinc-200 shadow-sm rounded-2xl p-6 flex flex-col justify-between gap-4 transition-all hover:shadow-md hover:border-amber-200">
               <div className="flex flex-col gap-2">
-                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500 font-bold border border-amber-100">
-                  🔔
+                <div className="w-12 h-12 flex items-center justify-center">
+                  <img src={bell3dIcon} alt="Bell Icon" className="w-full h-full object-contain" />
                 </div>
                 <div className="flex items-center gap-2 mt-2">
                   <h3 className="font-bold text-zinc-800 text-base">카톡 식단 알림 신청</h3>
@@ -1285,17 +1286,17 @@ function App() {
               <button
                 type="button"
                 onClick={() => setIsWelstoryModalOpen(true)}
-                className="w-full py-2.5 bg-zinc-800 hover:bg-zinc-900 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full py-2.5 bg-zinc-800 hover:bg-zinc-900 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center cursor-pointer"
               >
-                식단 알림 신청/설정 🔔
+                식단 알림 신청 및 설정
               </button>
             </div>
 
             {/* 위젯 3: 커피빵 미니게임 */}
             <div className="bg-white border border-zinc-200 shadow-sm rounded-2xl p-6 flex flex-col justify-between gap-4 transition-all hover:shadow-md hover:border-rose-200">
               <div className="flex flex-col gap-2">
-                <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-rose-500 font-bold border border-rose-100">
-                  🎮
+                <div className="w-12 h-12 flex items-center justify-center">
+                  <img src={coffee3dIcon} alt="Coffee Icon" className="w-full h-full object-contain" />
                 </div>
                 <h3 className="font-bold text-zinc-800 text-base mt-2">커피 내기 복불복</h3>
                 <p className="text-xs text-zinc-500 leading-relaxed">
@@ -1305,9 +1306,9 @@ function App() {
               <button
                 type="button"
                 onClick={() => initCoffeeGame(4)}
-                className="w-full py-2.5 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full py-2.5 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center cursor-pointer"
               >
-                소금 커피 내기 시작 🎮
+                커피 복불복 내기 시작
               </button>
             </div>
           </div>
