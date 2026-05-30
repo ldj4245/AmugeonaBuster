@@ -2,26 +2,32 @@ package com.amugeonabuster.application.service;
 
 import com.amugeonabuster.application.port.in.CreateRoomUseCase;
 import com.amugeonabuster.application.port.in.JoinRoomUseCase;
+import com.amugeonabuster.application.port.in.StartVotingUseCase;
+import com.amugeonabuster.application.port.in.SwipeMenuUseCase;
 import com.amugeonabuster.application.port.out.BroadcastRoomStatePort;
 import com.amugeonabuster.application.port.out.LoadRoomPort;
+import com.amugeonabuster.application.port.out.RecommendRestaurantsPort;
 import com.amugeonabuster.application.port.out.SaveRoomPort;
 import com.amugeonabuster.domain.model.Member;
+import com.amugeonabuster.domain.model.Restaurant;
 import com.amugeonabuster.domain.model.Room;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.util.List;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class RoomService implements CreateRoomUseCase, JoinRoomUseCase {
+public class RoomService implements CreateRoomUseCase, JoinRoomUseCase, StartVotingUseCase, SwipeMenuUseCase {
 
     private final SaveRoomPort saveRoomPort;
     private final LoadRoomPort loadRoomPort;
     private final BroadcastRoomStatePort broadcastRoomStatePort;
+    private final RecommendRestaurantsPort recommendRestaurantsPort;
 
     private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -68,6 +74,48 @@ public class RoomService implements CreateRoomUseCase, JoinRoomUseCase {
         saveRoomPort.saveRoom(room);
 
         // 실시간 대기실 유저 목록 자동 브로드캐스트 작동
+        broadcastRoomStatePort.broadcastRoomState(room);
+
+        return room;
+    }
+
+    @Override
+    public Room startVoting(StartVotingCommand command) {
+        Room room = loadRoomPort.loadRoom(command.getRoomId())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 방입니다. 코드: " + command.getRoomId()));
+
+        room.startVoting(command.getHostId());
+        saveRoomPort.saveRoom(room);
+
+        // 실시간 소켓 브로드캐스트 (대기방 화면에서 게임 시작 스와이프 화면으로 전환 유도)
+        broadcastRoomStatePort.broadcastRoomState(room);
+
+        return room;
+    }
+
+    @Override
+    public Room swipeMenu(SwipeMenuCommand command) {
+        Room room = loadRoomPort.loadRoom(command.getRoomId())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 방입니다. 코드: " + command.getRoomId()));
+
+        // 도메인의 스와이프 투표 규칙 가동
+        room.swipeMenu(command.getMemberId(), command.getMenuName(), command.isLike());
+
+        // 전원 스와이프 완료 여부 확인 및 1위 선정 가동
+        if (room.isAllMembersCompletedSwiping()) {
+            room.determineWinningMenu();
+
+            // 맛집 추천 아웃고잉 포트 가동 및 바인딩
+            List<Restaurant> recommended = recommendRestaurantsPort.recommend(
+                    room.getWinningMenu(),
+                    room.getLocation()
+            );
+            room.associateMatchedRestaurants(recommended);
+        }
+
+        saveRoomPort.saveRoom(room);
+
+        // 실시간 소켓 브로드캐스트 (투표 누적 게이지 바 및 최종 매칭 완료 통지)
         broadcastRoomStatePort.broadcastRoomState(room);
 
         return room;

@@ -13,9 +13,11 @@ public class HexagonalArchitectureTest {
     public static final ArchRule 헥사고날_의존성_무결성_검증 = onionArchitecture()
             .domainModels("..domain..")
             .domainServices("..application.service..")
-            .applicationServices("..application.service..")
+            .applicationServices("..application..")
             .adapter("web", "..adapter.in.web..")
-            .adapter("websocket", "..adapter.in.websocket..")
+            .adapter("websocket-in", "..adapter.in.websocket..")
+            .adapter("websocket-out", "..adapter.out.websocket..")
             .adapter("persistence", "..adapter.out.persistence..")
-            .adapter("external", "..adapter.out.external..");
+            .adapter("external", "..adapter.out.external..")
+            .adapter("mock", "..adapter.out.mock..");
 }

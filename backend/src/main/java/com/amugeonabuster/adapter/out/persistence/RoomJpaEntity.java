@@ -33,13 +33,24 @@ public class RoomJpaEntity {
     @OneToMany(mappedBy = "room", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<MemberJpaEntity> members = new ArrayList<>();
 
+    @OneToMany(mappedBy = "room", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<SwipeJpaEntity> swipes = new ArrayList<>();
+
+    private String winningMenu;
+
+    @OneToMany(mappedBy = "room", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<RestaurantJpaEntity> matchedRestaurants = new ArrayList<>();
+
     @Builder
-    public RoomJpaEntity(String id, UUID hostId, String location, RoomStatus status, List<MemberJpaEntity> members) {
+    public RoomJpaEntity(String id, UUID hostId, String location, RoomStatus status, List<MemberJpaEntity> members, List<SwipeJpaEntity> swipes, String winningMenu, List<RestaurantJpaEntity> matchedRestaurants) {
         this.id = id;
         this.hostId = hostId;
         this.location = location;
         this.status = status;
         this.members = members != null ? members : new ArrayList<>();
+        this.swipes = swipes != null ? swipes : new ArrayList<>();
+        this.winningMenu = winningMenu;
+        this.matchedRestaurants = matchedRestaurants != null ? matchedRestaurants : new ArrayList<>();
     }
 
     /**
@@ -48,5 +59,15 @@ public class RoomJpaEntity {
     public void addMember(MemberJpaEntity member) {
         this.members.add(member);
         member.associateRoom(this);
+    }
+
+    public void addSwipe(SwipeJpaEntity swipe) {
+        this.swipes.add(swipe);
+        swipe.associateRoom(this);
+    }
+
+    public void addRestaurant(RestaurantJpaEntity restaurant) {
+        this.matchedRestaurants.add(restaurant);
+        restaurant.associateRoom(this);
     }
 }

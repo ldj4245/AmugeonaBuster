@@ -1,4 +1,4 @@
-package com.amugeonabuster.adapter.in.web.dto;
+package com.amugeonabuster.adapter.out.websocket.dto;
 
 import com.amugeonabuster.domain.model.DefaultMenus;
 import com.amugeonabuster.domain.model.Room;
@@ -13,36 +13,36 @@ import java.util.stream.Collectors;
 
 @Getter
 @Builder
-public class RoomResponse {
+public class WebSocketRoomResponse {
     private final String roomId;
     private final UUID hostId;
     private final String location;
     private final RoomStatus status;
-    private final List<MemberResponse> members;
+    private final List<WebSocketMemberResponse> members;
     private final String winningMenu;
-    private final List<RestaurantResponse> matchedRestaurants;
+    private final List<WebSocketRestaurantResponse> matchedRestaurants;
     private final List<String> defaultMenus;
     private final int totalMembers;
     private final int completedMembersCount;
 
     /**
-     * 도메인 객체로부터 API 응답 포맷으로 고속 변환
+     * 도메인 객체로부터 웹소켓 응답 포맷으로 고속 변환
      */
-    public static RoomResponse fromDomain(Room room) {
+    public static WebSocketRoomResponse fromDomain(Room room) {
         if (room == null) {
             return null;
         }
 
-        List<MemberResponse> memberResponses = room.getMembers().stream()
-                .map(m -> MemberResponse.builder()
+        List<WebSocketMemberResponse> memberResponses = room.getMembers().stream()
+                .map(m -> WebSocketMemberResponse.builder()
                         .id(m.getId())
                         .nickname(m.getNickname())
                         .isReady(m.isReady())
                         .build())
                 .collect(Collectors.toList());
 
-        List<RestaurantResponse> restaurantResponses = room.getMatchedRestaurants().stream()
-                .map(RestaurantResponse::fromDomain)
+        List<WebSocketRestaurantResponse> restaurantResponses = room.getMatchedRestaurants().stream()
+                .map(WebSocketRestaurantResponse::fromDomain)
                 .collect(Collectors.toList());
 
         // 각 멤버별 스와이프 완료 여부를 집계하여 완료자 인원수 계산
@@ -58,7 +58,7 @@ public class RoomResponse {
                 })
                 .count();
 
-        return RoomResponse.builder()
+        return WebSocketRoomResponse.builder()
                 .roomId(room.getId())
                 .hostId(room.getHostId())
                 .location(room.getLocation())
