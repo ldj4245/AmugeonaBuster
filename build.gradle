@@ -1,0 +1,11 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.3.0' apply false
+    id 'io.spring.dependency-management' version '1.1.5' apply false
+}
+
+// Heroku runs the stage task by default or searches for the bootJar
+// We can define a stage task that delegates to backend build
+task stage {
+    dependsOn ':backend:build'
+}
