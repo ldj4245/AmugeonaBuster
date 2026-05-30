@@ -962,14 +962,19 @@ function App() {
           </div>
         )}
 
-        {!roomId && (
-          <button
-            onClick={() => triggerFetchMenuDetails('WEL_DSR', 'HALL_01', '삼성 DSR 타워 웰스토리')}
-            className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white px-4 py-2 rounded-xl text-xs font-black shadow-sm transition-all scale-100 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-          >
-            오늘의 식단표
-          </button>
-        )}
+        {!roomId && (() => {
+          const activeCotNo = welstorySettings?.cotNo || 'WEL_DSR';
+          const activeHallNo = welstorySettings?.hallNo || 'HALL_01';
+          const activeCafeteriaName = welstorySettings?.cafeteriaName || '삼성 DSR 타워 웰스토리';
+          return (
+            <button
+              onClick={() => triggerFetchMenuDetails(activeCotNo, activeHallNo, activeCafeteriaName)}
+              className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white px-4 py-2 rounded-xl text-xs font-black shadow-sm transition-all scale-100 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+            >
+              오늘의 식단표
+            </button>
+          );
+        })()}
       </header>
 
       {/* Main Container */}
@@ -1244,24 +1249,31 @@ function App() {
           {/* 독립 프리미엄 위젯 3형제 */}
           <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-6 mt-12 animate-slide-up">
             {/* 위젯 1: 실시간 식단표 */}
-            <div className="bg-white border border-zinc-200 shadow-sm rounded-2xl p-6 flex flex-col justify-between gap-4 transition-all hover:shadow-md hover:border-orange-200">
-              <div className="flex flex-col gap-2">
-                <div className="w-12 h-12 flex items-center justify-center">
-                  <img src={meal3dIcon} alt="Meal Icon" className="w-full h-full object-contain" />
+            {(() => {
+              const activeCotNo = welstorySettings?.cotNo || 'WEL_DSR';
+              const activeHallNo = welstorySettings?.hallNo || 'HALL_01';
+              const activeCafeteriaName = welstorySettings?.cafeteriaName || '삼성 DSR 타워 웰스토리';
+              return (
+                <div className="bg-white border border-zinc-200 shadow-sm rounded-2xl p-6 flex flex-col justify-between gap-4 transition-all hover:shadow-md hover:border-orange-200">
+                  <div className="flex flex-col gap-2">
+                    <div className="w-12 h-12 flex items-center justify-center">
+                      <img src={meal3dIcon} alt="Meal Icon" className="w-full h-full object-contain" />
+                    </div>
+                    <h3 className="font-bold text-zinc-800 text-base mt-2">오늘의 구내식당 식단표</h3>
+                    <p className="text-xs text-zinc-500 leading-relaxed">
+                      현재 설정된 <span className="font-bold text-orange-600">[{activeCafeteriaName}]</span>의 실시간 코너별 식단과 메인 요리 이미지를 고해상도로 즉시 확인하세요.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => triggerFetchMenuDetails(activeCotNo, activeHallNo, activeCafeteriaName)}
+                    className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center cursor-pointer"
+                  >
+                    식단표 보기
+                  </button>
                 </div>
-                <h3 className="font-bold text-zinc-800 text-base mt-2">오늘의 구내식당 식단표</h3>
-                <p className="text-xs text-zinc-500 leading-relaxed">
-                  오늘 제공되는 삼성 DSR 타워 웰스토리의 실시간 코너별 식단과 메인 요리 이미지를 고해상도로 즉시 확인하세요.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => triggerFetchMenuDetails('WEL_DSR', 'HALL_01', '삼성 DSR 타워 웰스토리')}
-                className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center cursor-pointer"
-              >
-                식단표 보기
-              </button>
-            </div>
+              );
+            })()}
 
             {/* 위젯 2: 스마트 카톡 식단 알림 */}
             <div className="bg-white border border-zinc-200 shadow-sm rounded-2xl p-6 flex flex-col justify-between gap-4 transition-all hover:shadow-md hover:border-amber-200">
