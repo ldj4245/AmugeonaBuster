@@ -6,6 +6,8 @@ import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -44,21 +46,29 @@ public class WelstoryMenuService {
     public WelstoryMenuResult getTodayMenu(String cotNo, String hallNo, String cafeteriaName) {
         LocalDate today = LocalDate.now();
         String dateStr = today.toString();
+        String targetUrl = String.format("https://welstoryplus.com/api/meal/mealList.do?cotNo=%s&hallNo=%s&menuDt=%s", 
+            cotNo, hallNo, today.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")));
+        
+        log.info("Attempting to fetch real-time Welstory menu from URL: {}", targetUrl);
         
         try {
-            // 💡 실제 웰스토리 플러스 오픈 API 호출 시도 (참고용 패턴)
-            // 실제 상용 환경에서 웰스토리 보안 차단 등이 있을 수 있어 가볍게 시도하고, 예외 발생 시 프리미엄 폴백으로 극강의 회복성을 가집니다.
-            String targetUrl = String.format("https://welstoryplus.com/api/meal/mealList.do?cotNo=%s&hallNo=%s&menuDt=%s", 
-                cotNo, hallNo, today.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")));
+            // 실제 RestTemplate 호출 수행
+            String responseStr = restTemplate.getForObject(targetUrl, String.class);
+            log.info("Successfully fetched response from Welstory API. Length: {}", responseStr != null ? responseStr.length() : 0);
             
-            log.info("Attempting to fetch Welstory menu from URL: {}", targetUrl);
+            if (responseStr != null && !responseStr.trim().isEmpty() && !responseStr.contains("Request Blocked") && !responseStr.contains("<html")) {
+                WelstoryMenuResult parsedResult = parseWelstoryResponse(responseStr, cafeteriaName);
+                if (parsedResult != null && !parsedResult.getCourses().isEmpty()) {
+                    log.info("Successfully parsed {} courses from real Welstory API!", parsedResult.getCourses().size());
+                    return parsedResult;
+                }
+            }
             
-            // 실제 외부 API 호출이 완벽히 정립되지 않았거나 차단 시를 위해 타임아웃을 짧게 잡거나 즉시 폴백 처리
-            // 아래의 프리미엄 폴백 데이터가 너무 고품질이므로, 이를 메인으로 하면서 실제 연동 시도를 결합합니다.
+            log.warn("API response is empty, blocked, or not valid JSON. Utilizing premium fallback menu.");
             return generatePremiumFallbackMenu(today, cafeteriaName);
             
         } catch (Exception e) {
-            log.warn("Failed to fetch menu from real Welstory API, utilizing premium fallback menu: {}", e.getMessage());
+            log.warn("Failed to fetch menu from real Welstory API ({}). Utilizing premium fallback menu.", e.getMessage());
             return generatePremiumFallbackMenu(today, cafeteriaName);
         }
     }
@@ -218,5 +228,118 @@ public class WelstoryMenuService {
             .dateStr(dateHeader)
             .courses(courses)
             .build();
+    }
+
+    /**
+     * 웰스토리 실시간 식단 API JSON 응답을 동적 매핑하여 코스별 구조를 복원합니다.
+     */
+    private WelstoryMenuResult parseWelstoryResponse(String jsonStr, String cafeteriaName) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode rootNode = mapper.readTree(jsonStr);
+            
+            JsonNode listNode = null;
+            
+            if (rootNode.has("data")) {
+                JsonNode dataNode = rootNode.get("data");
+                if (dataNode.has("mealList")) {
+                    listNode = dataNode.get("mealList");
+                } else if (dataNode.has("list")) {
+                    listNode = dataNode.get("list");
+                } else if (dataNode.isArray()) {
+                    listNode = dataNode;
+                } else {
+                    listNode = dataNode;
+                }
+            }
+            
+            if (listNode == null || listNode.isNull()) {
+                if (rootNode.has("mealList")) {
+                    listNode = rootNode.get("mealList");
+                } else if (rootNode.has("list")) {
+                    listNode = rootNode.get("list");
+                } else if (rootNode.isArray()) {
+                    listNode = rootNode;
+                }
+            }
+            
+            if (listNode == null || !listNode.isArray() || listNode.size() == 0) {
+                log.warn("No valid array node found in Welstory JSON payload.");
+                return null;
+            }
+            
+            List<CourseMenu> courses = new ArrayList<>();
+            LocalDate today = LocalDate.now();
+            DayOfWeek dayOfWeek = today.getDayOfWeek();
+            String dayKorean = dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN);
+            String dateHeader = String.format("%d월 %d일 (%s)", today.getMonthValue(), today.getDayOfMonth(), dayKorean);
+            
+            for (JsonNode item : listNode) {
+                String courseName = getJsonField(item, "courseName", "courseNm", "corner", "cornerName", "menuMealTypeVal");
+                String menuDetails = getJsonField(item, "menuDetails", "menuDetailsVal", "menuName", "menuNm", "menuNameVal", "menuDetails");
+                
+                if (courseName.isEmpty()) {
+                    courseName = "오늘의 코스";
+                }
+                
+                if (menuDetails.isEmpty()) {
+                    continue;
+                }
+                
+                int calories = 0;
+                JsonNode kcalNode = getJsonNode(item, "calories", "kcal", "totKcal", "kcalVal");
+                if (kcalNode != null && !kcalNode.isNull()) {
+                    calories = kcalNode.asInt();
+                }
+                
+                String price = "7,500원"; // 기본값
+                JsonNode priceNode = getJsonNode(item, "price", "priceVal", "menuPrice", "amt");
+                if (priceNode != null && !priceNode.isNull()) {
+                    if (priceNode.isNumber()) {
+                        price = String.format("%,d원", priceNode.asInt());
+                    } else {
+                        price = priceNode.asText();
+                    }
+                }
+                
+                String imageUrl = getJsonField(item, "imageUrl", "imgUrl", "imagePath", "photoPath", "photoUrl");
+                
+                courses.add(CourseMenu.builder()
+                    .courseName(courseName)
+                    .menuDetails(menuDetails)
+                    .calories(calories)
+                    .price(price)
+                    .imageUrl(imageUrl)
+                    .build());
+            }
+            
+            if (courses.isEmpty()) {
+                return null;
+            }
+            
+            return WelstoryMenuResult.builder()
+                .cafeteriaName(cafeteriaName != null ? cafeteriaName : "사내식당")
+                .dateStr(dateHeader)
+                .courses(courses)
+                .build();
+            
+        } catch (Exception e) {
+            log.error("Failed to parse Welstory JSON payload: {}", e.getMessage(), e);
+            return null;
+        }
+    }
+    
+    private String getJsonField(JsonNode node, String... fieldNames) {
+        JsonNode target = getJsonNode(node, fieldNames);
+        return target != null ? target.asText().trim() : "";
+    }
+    
+    private JsonNode getJsonNode(JsonNode node, String... fieldNames) {
+        for (String fieldName : fieldNames) {
+            if (node.has(fieldName)) {
+                return node.get(fieldName);
+            }
+        }
+        return null;
     }
 }
