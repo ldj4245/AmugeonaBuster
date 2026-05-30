@@ -145,7 +145,7 @@ function App() {
   const [menuDetailHallNo, setMenuDetailHallNo] = useState('');
 
   // 🎮 커피빵 내기 미니게임 관련 상태 변수
-  const [menuDetailTab, setMenuDetailTab] = useState<'menu' | 'game'>('menu');
+  const [isCoffeeGameOpen, setIsCoffeeGameOpen] = useState(false);
   const [playerCount, setPlayerCount] = useState(4);
   const [cupStates, setCupStates] = useState<{ flipped: boolean; isSalt: boolean }[]>([]);
   const [gameStatus, setGameStatus] = useState<'ready' | 'playing' | 'gameover'>('ready');
@@ -163,6 +163,7 @@ function App() {
     setGameStatus('playing');
     setLooserName('');
     setShowReceipt(false);
+    setIsCoffeeGameOpen(true);
   };
 
   // 사운드 재생 헬퍼
@@ -247,7 +248,6 @@ function App() {
     setMenuDetailLoading(true);
     setMenuDetailError(null);
     setIsMenuDetailOpen(true);
-    setMenuDetailTab('menu');
     setMenuDetailCafeteriaName(name);
     setMenuDetailCotNo(cotNo);
     setMenuDetailHallNo(hallNo);
@@ -963,7 +963,7 @@ function App() {
             className="flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white px-3.5 py-2 rounded-lg text-xs font-bold shadow-md transition-all scale-100 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            웰스토리 식단 & 커피빵 🔔
+            실시간 식단표 🍱
           </button>
         )}
       </header>
@@ -984,15 +984,16 @@ function App() {
 
         {/* ==================== 1. LANDING PHASE ==================== */}
         {!roomId && (
-          <div className="w-full grid md:grid-cols-12 gap-10 items-center">
+          <>
+            <div className="w-full grid md:grid-cols-12 gap-10 items-center">
             {/* Left: Hero Copy */}
             <div className="md:col-span-7 flex flex-col gap-5 text-center md:text-left">
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-zinc-900 leading-tight">
                 약속 메뉴 정할 땐,<br />
                 <span className="text-orange-500">스와이프 한 번이면 끝</span>
               </h1>
-              <p className="text-zinc-500 text-sm sm:text-base max-w-md leading-relaxed mx-auto md:mx-0">
-                더 이상 "아무거나"는 없습니다. 스와이프로 만족할 메뉴를 고르고, 쫄깃한 소금 아메리카노 복불복 게임으로 오늘 커피 쏠 주인공을 즉시 정해드려요! ☕🎰
+              <p className="text-zinc-500 text-sm sm:text-base max-w-md leading-relaxed mx-auto md:mx-0 font-medium">
+                더 이상 '아무거나'를 고민하며 시간 낭비하지 마세요. 스와이프 투표로 친구들과 오늘 최고의 메뉴를 찾고, 독립된 커피 내기 복불복 게임을 통해 즐거운 커피 타임을 완벽하게 결정해 드립니다. ☕🎰
               </p>
 
               {/* Feature Pills */}
@@ -1236,7 +1237,82 @@ function App() {
             </div>
             </div>
           </div>
-        )}
+
+          {/* 독립 프리미엄 위젯 3형제 */}
+          <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-6 mt-12 animate-slide-up">
+            {/* 위젯 1: 실시간 식단표 */}
+            <div className="bg-white border border-zinc-200 shadow-sm rounded-2xl p-6 flex flex-col justify-between gap-4 transition-all hover:shadow-md hover:border-orange-200">
+              <div className="flex flex-col gap-2">
+                <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500 font-bold border border-orange-100">
+                  🍱
+                </div>
+                <h3 className="font-bold text-zinc-800 text-base mt-2">오늘의 구내식당 식단표</h3>
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  오늘 제공되는 삼성 DSR 타워 웰스토리의 실시간 코너별 식단과 메인 요리 이미지를 고해상도로 즉시 확인하세요.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => triggerFetchMenuDetails('WEL_DSR', 'HALL_01', '삼성 DSR 타워 웰스토리')}
+                className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                실시간 식단 보기 🍱
+              </button>
+            </div>
+
+            {/* 위젯 2: 스마트 카톡 식단 알림 */}
+            <div className="bg-white border border-zinc-200 shadow-sm rounded-2xl p-6 flex flex-col justify-between gap-4 transition-all hover:shadow-md hover:border-amber-200">
+              <div className="flex flex-col gap-2">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500 font-bold border border-amber-100">
+                  🔔
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <h3 className="font-bold text-zinc-800 text-base">카톡 식단 알림 신청</h3>
+                  {welstorySettings ? (
+                    <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md">
+                      🟢 연동 중 ({welstorySettings.userName || '세션'})
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-bold text-zinc-400 bg-zinc-100 border border-zinc-200 px-1.5 py-0.5 rounded-md">
+                      🔴 계정 미연동
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  매일 지정한 요일과 시간에 오늘 제공되는 구내식당 식단표를 내 카카오톡 메시지로 편리하게 자동 수신합니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsWelstoryModalOpen(true)}
+                className="w-full py-2.5 bg-zinc-800 hover:bg-zinc-900 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                식단 알림 신청/설정 🔔
+              </button>
+            </div>
+
+            {/* 위젯 3: 커피빵 미니게임 */}
+            <div className="bg-white border border-zinc-200 shadow-sm rounded-2xl p-6 flex flex-col justify-between gap-4 transition-all hover:shadow-md hover:border-rose-200">
+              <div className="flex flex-col gap-2">
+                <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-rose-500 font-bold border border-rose-100">
+                  🎮
+                </div>
+                <h3 className="font-bold text-zinc-800 text-base mt-2">커피 내기 복불복</h3>
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  동료들과 식후 땡 커피 골든벨을 쏠 주인공을 즉시 정해보세요! 소금 폭탄 아메리카노 💀를 고르면 당첨입니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => initCoffeeGame(4)}
+                className="w-full py-2.5 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                소금 커피 내기 시작 🎮
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
         {/* ==================== 2. LOBBY PHASE ==================== */}
         {roomId && roomState && roomState.status === 'LOBBY' && (
@@ -1931,36 +2007,7 @@ function App() {
               </p>
             </div>
 
-            {/* 2. 모던 탭 컨트롤 바 */}
-            <div className="bg-white border-b border-zinc-200 p-2 shrink-0 flex gap-2">
-              <button 
-                onClick={() => setMenuDetailTab('menu')}
-                className={`flex-1 py-3 px-4 rounded-2xl font-black text-xs sm:text-sm transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer select-none ${
-                  menuDetailTab === 'menu' 
-                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md shadow-orange-500/20' 
-                    : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-500 border border-zinc-200/50'
-                }`}
-              >
-                🍱 오늘의 식단 전체보기
-              </button>
-              <button 
-                onClick={() => {
-                  setMenuDetailTab('game');
-                  initCoffeeGame(playerCount);
-                }}
-                className={`flex-1 py-3 px-4 rounded-2xl font-black text-xs sm:text-sm transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer select-none ${
-                  menuDetailTab === 'game' 
-                    ? 'bg-gradient-to-r from-rose-500 to-red-500 text-white shadow-md shadow-red-500/20' 
-                    : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-500 border border-zinc-200/50'
-                }`}
-              >
-                🔥 커피빵 복불복 내기
-              </button>
-            </div>
-
-            {/* 3. 오늘의 식단 탭 화면 */}
-            {menuDetailTab === 'menu' && (
-              <>
+            {/* 2. 실시간 식단 데이터 영역 */}
                 {/* 2. 로딩 상태 */}
                 {menuDetailLoading && (
                   <div className="flex flex-col items-center justify-center py-24 px-6 gap-5 text-center flex-grow">
@@ -2129,92 +2176,134 @@ function App() {
                     </div>
                   </div>
                 )}
-              </>
-            )}
 
-            {/* 4. 커피빵 내기 탭 화면 */}
-            {menuDetailTab === 'game' && (
-              <div className="overflow-y-auto p-5 sm:p-8 flex-grow bg-slate-50/50 flex flex-col items-center justify-start gap-6 select-none">
-                {/* A. 상단 컨트롤 패널 */}
-                <div className="w-full max-w-md bg-white border border-zinc-200/80 p-5 rounded-3xl shadow-sm flex flex-col gap-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs sm:text-sm font-black text-zinc-700 flex items-center gap-1.5">
-                      👥 내기 참여 인원
-                    </span>
-                    <span className="text-sm sm:text-base font-black text-rose-500 font-mono bg-rose-50 px-3 py-1 rounded-xl">
-                      {playerCount}명
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <button 
-                      onClick={() => {
-                        const val = Math.max(3, playerCount - 1);
-                        setPlayerCount(val);
-                        initCoffeeGame(val);
-                      }}
-                      className="w-10 h-10 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200/50 text-zinc-600 font-black text-lg flex items-center justify-center cursor-pointer select-none"
-                    >
-                      -
-                    </button>
-                    <input 
-                      type="range" 
-                      min="3" 
-                      max="8" 
-                      value={playerCount} 
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value, 10);
-                        setPlayerCount(val);
-                        initCoffeeGame(val);
-                      }}
-                      className="flex-grow h-2 bg-zinc-100 rounded-lg appearance-none cursor-pointer accent-rose-500"
-                    />
-                    <button 
-                      onClick={() => {
-                        const val = Math.min(8, playerCount + 1);
-                        setPlayerCount(val);
-                        initCoffeeGame(val);
-                      }}
-                      className="w-10 h-10 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200/50 text-zinc-600 font-black text-lg flex items-center justify-center cursor-pointer select-none"
-                    >
-                      +
-                    </button>
-                  </div>
+            {/* 6. 모달 하단 퀵 액션 */}
+            <div className="bg-zinc-50/80 border-t border-zinc-200 p-4 shrink-0 flex items-center justify-between gap-4 text-xs font-bold text-zinc-500 sm:px-6">
+              <span>💡 카카오톡 식단 알림의 발송 시간, 수신 요일, 대상 식당 지점은 우측 상단의 설정(⚙️) 아이콘을 통해 언제든지 자유롭게 수정하실 수 있습니다.</span>
+              <button 
+                onClick={() => setIsMenuDetailOpen(false)}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-900 text-white rounded-lg transition-colors cursor-pointer shrink-0"
+              >
+                닫기
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ==================== 8. 커피빵 내기 미니게임 모달 (isCoffeeGameOpen) ==================== */}
+      {isCoffeeGameOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-md animate-fade-in select-none">
+          <div className="bg-white border border-zinc-200/80 shadow-2xl rounded-3xl w-full max-w-2xl h-[85vh] sm:h-[80vh] flex flex-col overflow-hidden animate-scale-up">
+            
+            {/* 1. 모달 헤더 */}
+            <div className="bg-gradient-to-br from-rose-500 via-pink-500 to-amber-500 text-white p-6 sm:p-8 relative flex flex-col gap-2 shrink-0 shadow-lg">
+              <div className="absolute top-4 sm:top-6 right-4 sm:right-6">
+                <button 
+                  onClick={() => setIsCoffeeGameOpen(false)}
+                  title="게임 종료"
+                  className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center shadow-xs"
+                >
+                  <X className="w-4 h-4 sm:w-5 h-5" />
+                </button>
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-rose-950 bg-rose-100 self-start px-3 py-1 rounded-full shadow-inner">
+                🎮 커피빵 미니게임
+              </span>
+              <h3 className="text-xl sm:text-2xl font-black tracking-tight mt-1 flex items-center gap-2">
+                소금 아메리카노 복불복 ☕
+              </h3>
+              <p className="text-xs sm:text-sm text-white/95 font-medium mt-0.5 leading-relaxed">
+                엎어진 컵 아래에 숨겨진 썩은 소금 아메리카노(꽝)를 피해 동료들과 쫄깃한 긴장감을 느껴보세요!
+              </p>
+            </div>
+
+            {/* 2. 게임 플레이 스크롤 영역 */}
+            <div className="overflow-y-auto p-5 sm:p-8 flex-grow bg-slate-50/50 flex flex-col items-center justify-start gap-6">
+              
+              {/* A. 상단 컨트롤 패널 */}
+              <div className="w-full max-w-md bg-white border border-zinc-200/80 p-5 rounded-3xl shadow-sm flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs sm:text-sm font-black text-zinc-700 flex items-center gap-1.5">
+                    👥 내기 참여 인원
+                  </span>
+                  <span className="text-sm sm:text-base font-black text-rose-500 font-mono bg-rose-50 px-3 py-1 rounded-xl">
+                    {playerCount}명
+                  </span>
+                </div>
+                <div className="flex items-center gap-4">
                   <button 
-                    onClick={() => initCoffeeGame(playerCount)}
-                    className="w-full py-3 bg-rose-500 hover:bg-rose-600 text-white font-black text-xs rounded-2xl transition-all shadow-md shadow-rose-500/20 cursor-pointer"
+                    onClick={() => {
+                      const val = Math.max(3, playerCount - 1);
+                      setPlayerCount(val);
+                      initCoffeeGame(val);
+                    }}
+                    className="w-10 h-10 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200/50 text-zinc-600 font-black text-lg flex items-center justify-center cursor-pointer select-none"
                   >
-                    🔄 컵 다시 섞기
+                    -
+                  </button>
+                  <input 
+                    type="range" 
+                    min="3" 
+                    max="8" 
+                    value={playerCount} 
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      setPlayerCount(val);
+                      initCoffeeGame(val);
+                    }}
+                    className="flex-grow h-2 bg-zinc-100 rounded-lg appearance-none cursor-pointer accent-rose-500"
+                  />
+                  <button 
+                    onClick={() => {
+                      const val = Math.min(8, playerCount + 1);
+                      setPlayerCount(val);
+                      initCoffeeGame(val);
+                    }}
+                    className="w-10 h-10 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200/50 text-zinc-600 font-black text-lg flex items-center justify-center cursor-pointer select-none"
+                  >
+                    +
                   </button>
                 </div>
+                <button 
+                  onClick={() => initCoffeeGame(playerCount)}
+                  className="w-full py-3 bg-rose-500 hover:bg-rose-600 text-white font-black text-xs rounded-2xl transition-all shadow-md shadow-rose-500/20 cursor-pointer"
+                >
+                  🔄 컵 다시 섞기
+                </button>
+              </div>
 
-                {/* B. 게임 플레이 영역 */}
-                {gameStatus === 'playing' && (
-                  <div className="w-full max-w-lg mt-2 animate-slide-up">
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 justify-items-center">
-                      {cupStates.map((cup, idx) => (
+              {/* B. 게임 플레이 영역 (하이브리드 3D 쉘 렌더링 적용) */}
+              {gameStatus === 'playing' && (
+                <div className="w-full max-w-lg mt-2 animate-slide-up">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 justify-items-center">
+                    {cupStates.map((cup, idx) => (
+                      <div 
+                        key={idx}
+                        onClick={() => handleCupClick(idx)}
+                        className="relative w-20 h-24 sm:w-24 sm:h-28 cursor-pointer perspective-1000 group select-none"
+                      >
                         <div 
-                          key={idx}
-                          onClick={() => handleCupClick(idx)}
-                          className="relative w-20 h-24 sm:w-24 sm:h-28 cursor-pointer [perspective:1000px] group select-none"
+                          className={`relative w-full h-full rounded-2xl transition-transform duration-500 preserve-3d shadow-sm ${
+                            cup.flipped ? '[transform:rotateY(180deg)]' : 'group-hover:scale-105'
+                          }`}
                         >
-                          <div 
-                            className={`relative w-full h-full rounded-2xl transition-transform duration-500 [transform-style:preserve-3d] shadow-sm ${
-                              cup.flipped ? '[transform:rotateY(180deg)]' : 'group-hover:scale-105'
-                            }`}
-                          >
-                            {/* 컵 앞면 (엎어져 있는 상태) */}
-                            <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700 rounded-2xl flex flex-col items-center justify-center gap-1 backface-hidden text-white">
-                              <span className="text-xl sm:text-2xl animate-pulse">☕</span>
-                              <span className="text-[10px] font-black font-mono text-zinc-400">CUP {idx + 1}</span>
-                            </div>
+                          {/* 컵 앞면 (엎어져 있는 상태) */}
+                          <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700 rounded-2xl flex flex-col items-center justify-center gap-1 backface-hidden text-white">
+                            <span className="text-xl sm:text-2xl animate-pulse">☕</span>
+                            <span className="text-[10px] font-black font-mono text-zinc-400">CUP {idx + 1}</span>
+                          </div>
 
-                            {/* 컵 뒷면 (뒤집힌 상태 - 커피 또는 소금) */}
-                            <div className={`absolute inset-0 border rounded-2xl flex flex-col items-center justify-center [transform:rotateY(180deg)] backface-hidden ${
-                              cup.isSalt 
-                                ? 'bg-gradient-to-br from-red-50 to-rose-100 border-red-300 text-red-500' 
-                                : 'bg-gradient-to-br from-amber-50 to-orange-100 border-orange-300 text-amber-800'
-                            }`}>
-                              {cup.isSalt ? (
+                          {/* 컵 뒷면 (뒤집힌 상태 - 커피 또는 소금) */}
+                          {/* 앞뒷면 컨테이너는 항상 존재하지만 내부 이모지와 라벨은 flipped 상태일 때만 생성하여 정보 원천 차단 */}
+                          <div className={`absolute inset-0 border rounded-2xl flex flex-col items-center justify-center [transform:rotateY(180deg)] backface-hidden ${
+                            cup.isSalt 
+                              ? 'bg-gradient-to-br from-red-50 to-rose-100 border-red-300 text-red-500' 
+                              : 'bg-gradient-to-br from-amber-50 to-orange-100 border-orange-300 text-amber-800'
+                          }`}>
+                            {cup.flipped && (
+                              cup.isSalt ? (
                                 <>
                                   <span className="text-3xl animate-bounce">💀🧂</span>
                                   <span className="text-[9px] font-black text-red-600 bg-red-100 px-1.5 py-0.5 rounded-md mt-1 font-mono">폭탄 당첨</span>
@@ -2224,124 +2313,120 @@ function App() {
                                   <span className="text-2xl">☕✨</span>
                                   <span className="text-[9px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-md mt-1 font-mono">SAFE</span>
                                 </>
-                              )}
-                            </div>
+                              )
+                            )}
                           </div>
                         </div>
-                      ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* C. 꽝 발생: 당첨자 이름 입력 화면 */}
+              {gameStatus === 'gameover' && !showReceipt && (
+                <div className="w-full max-w-md bg-white border border-rose-100 p-6 rounded-3xl shadow-xl flex flex-col items-center gap-5 text-center border-t-4 border-t-rose-500 animate-slide-up mt-2">
+                  <span className="text-5xl animate-bounce">💀🧂</span>
+                  <div className="flex flex-col gap-1.5">
+                    <h4 className="text-base font-black text-zinc-800">소금 폭탄 아메리카노 당첨!</h4>
+                    <p className="text-xs text-zinc-500 font-medium">영광의 커피 골든벨을 울릴 주인공의 성함/닉네임을 입력하세요.</p>
+                  </div>
+                  <input 
+                    type="text" 
+                    value={looserName} 
+                    onChange={(e) => setLooserName(e.target.value)}
+                    placeholder="예: 홍대리, 김과장"
+                    maxLength={10}
+                    className="w-full px-4 py-3 border border-zinc-200 focus:border-rose-500 rounded-2xl font-bold text-center text-zinc-800 focus:outline-none shadow-sm transition-all"
+                  />
+                  <button 
+                    onClick={() => {
+                      if (!looserName.trim()) return;
+                      setShowReceipt(true);
+                      playAudio('https://assets.mixkit.co/active_storage/sfx/1657/1657-200.wav');
+                    }}
+                    disabled={!looserName.trim()}
+                    className="w-full py-3.5 bg-rose-500 hover:bg-rose-600 disabled:bg-zinc-300 text-white font-black text-xs rounded-2xl transition-all shadow-md cursor-pointer select-none"
+                  >
+                    🧾 골든벨 영수증 발급하기
+                  </button>
+                </div>
+              )}
+
+              {/* D. 최종 골든벨 영수증 렌더링 */}
+              {gameStatus === 'gameover' && showReceipt && (
+                <div className="w-full max-w-xs bg-white border-2 border-dashed border-zinc-300 p-6 rounded-3xl shadow-2xl flex flex-col gap-4 text-zinc-800 relative font-mono overflow-hidden animate-receipt-roll mt-2">
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-[repeating-linear-gradient(90deg,#000,#000_10px,transparent_10px,transparent_20px)] opacity-10" />
+                  
+                  <div className="text-center flex flex-col gap-1 border-b border-dashed border-zinc-300 pb-4">
+                    <h3 className="text-sm font-black tracking-widest text-zinc-800 uppercase">☕ [아무거나 커피숍] ☕</h3>
+                    <span className="text-[9px] font-bold text-zinc-400">AMUGEONA COFFEE SHOP (DSR BLDG)</span>
+                    <span className="text-[9px] font-bold text-zinc-400">TEL: 02-1234-5678</span>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 text-[10px] font-bold border-b border-dashed border-zinc-300 pb-4">
+                    <div className="flex justify-between">
+                      <span>발행일시:</span>
+                      <span>{new Date().toISOString().replace('T', ' ').substring(0, 19)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>주문번호:</span>
+                      <span># {Math.floor(Math.random() * 90000) + 10000}</span>
+                    </div>
+                    <div className="flex justify-between text-rose-500">
+                      <span>당첨구분:</span>
+                      <span>소금 커피 골든벨 당첨 🔔</span>
                     </div>
                   </div>
-                )}
 
-                {/* C. 꽝 발생: 당첨자 이름 입력 화면 */}
-                {gameStatus === 'gameover' && !showReceipt && (
-                  <div className="w-full max-w-md bg-white border border-rose-100 p-6 rounded-3xl shadow-xl flex flex-col items-center gap-5 text-center border-t-4 border-t-rose-500 animate-slide-up mt-2">
-                    <span className="text-5xl animate-bounce">💀🧂</span>
-                    <div className="flex flex-col gap-1.5">
-                      <h4 className="text-base font-black text-zinc-800">소금 폭탄 아메리카노 당첨!</h4>
-                      <p className="text-xs text-zinc-500 font-medium">영광의 커피 골든벨을 울릴 주인공의 성함/닉네임을 입력하세요.</p>
+                  <div className="flex flex-col gap-2.5 text-[10px] font-bold border-b border-dashed border-zinc-300 pb-4">
+                    <div className="flex justify-between text-zinc-400 font-extrabold text-[9px] uppercase">
+                      <span>상품명 [QTY]</span>
+                      <span>금액</span>
                     </div>
-                    <input 
-                      type="text" 
-                      value={looserName} 
-                      onChange={(e) => setLooserName(e.target.value)}
-                      placeholder="예: 홍대리, 김과장"
-                      maxLength={10}
-                      className="w-full px-4 py-3 border border-zinc-200 focus:border-rose-500 rounded-2xl font-bold text-center text-zinc-800 focus:outline-none shadow-sm transition-all"
-                    />
+                    <div className="flex justify-between text-zinc-800">
+                      <span>💀 소금 아메리카노 [1]</span>
+                      <span>₩ 55,000</span>
+                    </div>
+                    <div className="flex justify-between text-zinc-800">
+                      <span>💖 동료들의 사랑/박수 [{playerCount - 1}]</span>
+                      <span>₩ 0 (Priceless)</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2 text-xs font-black pt-2 text-center">
+                    <div className="flex justify-between text-rose-600 border-b border-dashed border-zinc-200 pb-2">
+                      <span>최종 결제자:</span>
+                      <span>{looserName} 💸</span>
+                    </div>
+                    <p className="text-[10px] text-zinc-500 mt-2 font-black leading-relaxed">
+                      "오늘 커피는 {looserName}님이 시원하게 쏘십니다! 다들 감사히 잘 먹겠습니다! 😍☕"
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-zinc-200">
                     <button 
-                      onClick={() => {
-                        if (!looserName.trim()) return;
-                        setShowReceipt(true);
-                        playAudio('https://assets.mixkit.co/active_storage/sfx/1657/1657-200.wav');
-                      }}
-                      disabled={!looserName.trim()}
-                      className="w-full py-3.5 bg-rose-500 hover:bg-rose-600 disabled:bg-zinc-300 text-white font-black text-xs rounded-2xl transition-all shadow-md cursor-pointer select-none"
+                      onClick={handleKakaoShareReceipt}
+                      className="w-full py-3 bg-[#FEE500] hover:bg-[#FDD000] text-zinc-900 font-black text-xs rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-xs"
                     >
-                      🧾 골든벨 영수증 발급하기
+                      💬 단톡방에 골든벨 박제하기
+                    </button>
+                    <button 
+                      onClick={() => initCoffeeGame(playerCount)}
+                      className="w-full py-3 bg-zinc-800 hover:bg-zinc-900 text-white font-black text-xs rounded-2xl cursor-pointer transition-colors shadow-xs"
+                    >
+                      🔄 한 판 더 하기!
                     </button>
                   </div>
-                )}
-
-                {/* D. 최종 골든벨 영수증 렌더링 */}
-                {gameStatus === 'gameover' && showReceipt && (
-                  <div className="w-full max-w-xs bg-white border-2 border-dashed border-zinc-300 p-6 rounded-3xl shadow-2xl flex flex-col gap-4 text-zinc-800 relative font-mono overflow-hidden animate-receipt-roll mt-2">
-                    <div className="absolute top-0 left-0 right-0 h-1 bg-[repeating-linear-gradient(90deg,#000,#000_10px,transparent_10px,transparent_20px)] opacity-10" />
-                    
-                    <div className="text-center flex flex-col gap-1 border-b border-dashed border-zinc-300 pb-4">
-                      <h3 className="text-sm font-black tracking-widest text-zinc-800 uppercase">☕ [아무거나 커피숍] ☕</h3>
-                      <span className="text-[9px] font-bold text-zinc-400">AMUGEONA COFFEE SHOP (DSR BLDG)</span>
-                      <span className="text-[9px] font-bold text-zinc-400">TEL: 02-1234-5678</span>
-                    </div>
-
-                    <div className="flex flex-col gap-1.5 text-[10px] font-bold border-b border-dashed border-zinc-300 pb-4">
-                      <div className="flex justify-between">
-                        <span>발행일시:</span>
-                        <span>{new Date().toISOString().replace('T', ' ').substring(0, 19)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>주문번호:</span>
-                        <span># {Math.floor(Math.random() * 90000) + 10000}</span>
-                      </div>
-                      <div className="flex justify-between text-rose-500">
-                        <span>당첨구분:</span>
-                        <span>소금 커피 골든벨 당첨 🔔</span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-2.5 text-[10px] font-bold border-b border-dashed border-zinc-300 pb-4">
-                      <div className="flex justify-between text-zinc-400 font-extrabold text-[9px] uppercase">
-                        <span>상품명 [QTY]</span>
-                        <span>금액</span>
-                      </div>
-                      <div className="flex justify-between text-zinc-800">
-                        <span>💀 소금 아메리카노 [1]</span>
-                        <span>₩ 55,000</span>
-                      </div>
-                      <div className="flex justify-between text-zinc-800">
-                        <span>💖 동료들의 사랑/박수 [{playerCount - 1}]</span>
-                        <span>₩ 0 (Priceless)</span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-2 text-xs font-black pt-2 text-center">
-                      <div className="flex justify-between text-rose-600 border-b border-dashed border-zinc-200 pb-2">
-                        <span>최종 결제자:</span>
-                        <span>{looserName} 💸</span>
-                      </div>
-                      <p className="text-[10px] text-zinc-500 mt-2 font-black leading-relaxed">
-                        "오늘 커피는 {looserName}님이 시원하게 쏘십니다! 다들 감사히 잘 먹겠습니다! 😍☕"
-                      </p>
-                    </div>
-
-                    <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-zinc-200">
-                      <button 
-                        onClick={handleKakaoShareReceipt}
-                        className="w-full py-3 bg-[#FEE500] hover:bg-[#FDD000] text-zinc-900 font-black text-xs rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-xs"
-                      >
-                        💬 단톡방에 골든벨 박제하기
-                      </button>
-                      <button 
-                        onClick={() => initCoffeeGame(playerCount)}
-                        className="w-full py-3 bg-zinc-800 hover:bg-zinc-900 text-white font-black text-xs rounded-2xl cursor-pointer transition-colors shadow-xs"
-                      >
-                        🔄 한 판 더 하기!
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* 6. 모달 하단 퀵 액션 */}
-            <div className="bg-zinc-50/80 border-t border-zinc-200 p-4 shrink-0 flex items-center justify-between gap-4 text-xs font-bold text-zinc-500 sm:px-6">
-              {menuDetailTab === 'menu' ? (
-                <span>💡 카카오톡 식단 알림의 발송 시간, 수신 요일, 대상 식당 지점은 우측 상단의 설정(⚙️) 아이콘을 통해 언제든지 자유롭게 수정하실 수 있습니다.</span>
-              ) : (
-                <span className="text-rose-500 flex items-center gap-1 font-black">⚡ 엎어진 커피컵들 중 소금 폭탄 아메리카노 💀가 숨겨져 있습니다! 한 명씩 터치하세요!</span>
+                </div>
               )}
+            </div>
+
+            {/* 3. 모달 하단 퀵 액션 */}
+            <div className="bg-zinc-50/80 border-t border-zinc-200 p-4 shrink-0 flex items-center justify-between gap-4 text-xs font-bold text-zinc-500 sm:px-6">
+              <span className="text-rose-500 flex items-center gap-1 font-black">⚡ 엎어진 커피컵들 중 소금 폭탄 아메리카노 💀가 숨겨져 있습니다! 한 명씩 터치하세요!</span>
               <button 
-                onClick={() => setIsMenuDetailOpen(false)}
+                onClick={() => setIsCoffeeGameOpen(false)}
                 className="px-4 py-2 bg-zinc-800 hover:bg-zinc-900 text-white rounded-lg transition-colors cursor-pointer shrink-0"
               >
                 닫기
