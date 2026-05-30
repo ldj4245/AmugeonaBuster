@@ -959,11 +959,11 @@ function App() {
 
         {!roomId && (
           <button
-            onClick={() => setIsWelstoryModalOpen(true)}
+            onClick={() => triggerFetchMenuDetails('WEL_DSR', 'HALL_01', '삼성 DSR 타워 웰스토리')}
             className="flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white px-3.5 py-2 rounded-lg text-xs font-bold shadow-md transition-all scale-100 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            웰스토리 식단 알림 🔔
+            웰스토리 식단 & 커피빵 🔔
           </button>
         )}
       </header>
