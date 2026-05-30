@@ -124,6 +124,8 @@ public class WelstoryMenuService {
     private WelstoryMenuResult parseWelplanMenus(String jsonStr, String cafeteriaName, String yyyyMMdd) {
         try {
             ObjectMapper mapper = new ObjectMapper();
+            mapper.configure(com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES, true);
+            mapper.configure(com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_SINGLE_QUOTES, true);
             JsonNode listNode = mapper.readTree(jsonStr);
             if (!listNode.isArray() || listNode.size() == 0) {
                 return null;
