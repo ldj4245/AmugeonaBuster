@@ -274,19 +274,36 @@ function App() {
     }
   };
 
-  // 🛡️ 모달 오픈 시 모바일 배경 스크롤 누수 차단 (Body Scroll Lock)
+  // 🛡️ 모바일 인앱 브라우저(카카오톡 등) 및 iOS Safari 배경 스크롤 누수 완전 차단 (Scroll Position Memory Lock)
   useEffect(() => {
     const isAnyModalOpen = isWelstoryModalOpen || isMenuDetailOpen || isCoffeeGameOpen;
+    
     if (isAnyModalOpen) {
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
       document.body.style.overflow = 'hidden';
-      document.body.style.position = 'relative'; // iOS Safari 호환용 포지션 설정
+      document.body.dataset.scrollY = scrollY.toString();
     } else {
-      document.body.style.overflow = '';
+      const savedScrollY = document.body.dataset.scrollY;
       document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+      delete document.body.dataset.scrollY;
+      
+      if (savedScrollY) {
+        window.scrollTo(0, parseInt(savedScrollY, 10));
+      }
     }
+    
     return () => {
-      document.body.style.overflow = '';
       document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+      delete document.body.dataset.scrollY;
     };
   }, [isWelstoryModalOpen, isMenuDetailOpen, isCoffeeGameOpen]);
 
