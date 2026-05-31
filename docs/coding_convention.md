@@ -85,3 +85,58 @@ export const Header: React.FC<HeaderProps> = ({ title }) => {
 1.  **컴포넌트 파일:** 컴포넌트를 가진 파일명은 파스칼 케이스(**PascalCase**) 및 `.tsx` 확장자를 사용합니다. (예: `RoomLobby.tsx`, `SwipeCard.tsx`)
 2.  **일반 유틸 및 타입 파일:** 일반 로직이나 타입 선언 파일은 카멜 케이스(**camelCase**) 및 `.ts` 확장자를 사용합니다. (예: `useWebSocket.ts`, `types.ts`)
 3.  **Tailwind CSS 정렬:** 컴포넌트의 마크업 내 `className` 속성은 가독성을 위해 **레이아웃(w, h, flex) -> 스페이싱(p, m) -> 디자인(bg, text, border) -> 인터랙션(hover, active) -> 애니메이션** 순으로 정렬하는 것을 지향합니다.
+
+---
+
+## 4. 모바일 및 인앱 브라우저 대응 컨벤션 (Mobile WebView Workarounds)
+
+카카오톡 인앱 브라우저 및 iOS Safari 등 일부 터치 제스처 기반 모바일 웹뷰(WKWebView) 환경에서는 일반적인 브라우저와 다른 고유 렌더링 결함(예: 탄성 스크롤 바운스 누수)이 존재하므로, 이를 예방하기 위한 특수 구현 컨벤션을 따릅니다.
+
+### A. 배경 스크롤 누수 완전 차단 규칙 (Scroll Position Memory Lock)
+모바일 환경에서는 모달 창이 노출되었을 때 `body { overflow: hidden }` 스타일만으로는 뒷배경 스크롤의 탄성 드래그(Rubber-banding)를 차단할 수 없습니다. 따라서 모달 개설 시 반드시 **Scroll Position Memory Lock** 기법을 적용해야 합니다.
+
+1.  **동작 원리:**
+    *   모달이 열리는 순간 사용자의 현재 스크롤 위치(`window.scrollY`)를 백업합니다.
+    *   `body`를 `position: fixed`로 강제 설정하여 뷰포트를 화면에 고정하고, `top` 좌표를 음수 단위의 스크롤 값(`-scrollY`)으로 변경해 고정 당시의 화면 위치를 보존합니다.
+    *   모달이 닫히면 고정을 해제하고, 백업해 두었던 스크롤 좌표로 즉각 복원(`window.scrollTo`)시킵니다.
+
+2.  **구현 예시 (React Hook / Effect):**
+```typescript
+useEffect(() => {
+  const isAnyModalOpen = isWelstoryModalOpen || isMenuDetailOpen;
+  
+  if (isAnyModalOpen) {
+    const scrollY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    document.body.style.overflow = 'hidden';
+    document.body.dataset.scrollY = scrollY.toString();
+  } else {
+    const savedScrollY = document.body.dataset.scrollY;
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    document.body.style.overflow = '';
+    delete document.body.dataset.scrollY;
+    
+    if (savedScrollY) {
+      window.scrollTo(0, parseInt(savedScrollY, 10));
+    }
+  }
+  
+  return () => {
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    document.body.style.overflow = '';
+    delete document.body.dataset.scrollY;
+  };
+}, [isWelstoryModalOpen, isMenuDetailOpen]);
+```
+
+### B. 스크롤 경계 격리 (`overscroll-contain`)
+모달 내부에 스크롤 뷰가 존재하는 경우(예: 식단 정보 리스트), 해당 스크롤 컨테이너의 최상단/최하단 도달 시 발생하는 스크롤 이벤트가 부모 창이나 배경으로 전이되는 것을 막기 위해, 스크롤 컨테이너에 반드시 CSS `overscroll-behavior: contain` (Tailwind CSS: **`overscroll-contain`**) 속성을 지정해야 합니다.
+
+*   *올바른 예:* `<div className="overflow-y-auto overscroll-contain">...</div>`
+

@@ -132,3 +132,20 @@ public class HexagonalArchitectureTest {
 }
 ```
 *   본 테스트는 도메인이 어댑터 계층을 참조하거나, 웹 어댑터가 영속성 어댑터를 직접 참조하는 등의 아키텍처 붕괴를 **빌드 시간(Compile time / Test phase)**에 기계적으로 전면 통제합니다.
+
+---
+
+## 6. 비동기/정기 스케줄러 및 외부 API 클라이언트 규칙 (Scheduler & External API)
+
+헥사고날 아키텍처에서 비동기 배치 및 정기 스케줄러(Scheduler), 그리고 외부 서드파티 통신 클라이언트(External API Client)의 흐름과 아키텍처적 규칙을 규정합니다.
+
+### A. 스케줄러 오케스트레이션 (Scheduler Orchestration)
+`com.amugeonabuster.application.service.WelstoryScheduler`는 매 분 0초마다 구동되어 알림 발송 조건에 맞는 유저를 RDB에서 찾고, 식단 정보를 수집하여 카톡방으로 발송하는 백그라운드 오케스트레이터입니다.
+*   **아키텍처 위치:** 스케줄러는 시스템의 백그라운드에서 주기적으로 실행을 트리거하는 자율 주행형 **인커밍 어댑터(Incoming Adapter)**의 역할과 비즈니스 흐름을 조율하는 **애플리케이션 서비스(Application Service)**의 역할을 겸합니다.
+*   **동작 제약:** 도메인 엔티티를 직접 변경하기보다, 아웃고잉 포트(`WelstoryAlertPort`)와 관련 애플리케이션 서비스들을 호출하여 비즈니스 연쇄 작업을 오케스트레이션해야 합니다.
+
+### B. 실용적 외부 API 직접 연동 모델 (Pragmatic External API Integration)
+엄격한 헥사고날 구조에서는 카카오 OAuth 토큰 조회/갱신 및 웰스토리 식단 크롤링 API 연동을 위해 각각 `port.out` 인터페이스를 정의하고 `adapter.out.external`에서 RestClient/WebClient 등으로 실제 통신을 처리하는 것이 정석입니다.
+*   **실용주의적 타협 (Pragmatic Trade-off):** 그러나 본 프로젝트의 기민한 기능 배포와 코드 일원화를 위해, `KakaoMessageService`와 `WelstoryMenuService`는 `application.service` 패키지 내부에서 스프링의 `RestClient`를 활용해 직접 카카오 및 웰스토리 API와 통신을 수행하도록 실용적으로 단순화하여 설계되었습니다.
+*   **아키텍처 부채 관리:** 이 서비스들은 외부 프레임워크 및 통신 기술에 강하게 결합되어 있으므로, 향후 도메인 및 비즈니스 로직의 완전한 고립성과 테스트 격리 수준을 보장해야 할 경우 **가장 먼저 `port.out` 인터페이스로 포트를 추상화하고 실제 구현부를 `adapter.out.external` 하위로 이식(Refactoring)하는 작업**을 우선 고려합니다.
+
