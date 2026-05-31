@@ -40,8 +40,11 @@ public class WelstoryAlertService implements WelstoryAlertUseCase {
             setting.getCafeteriaName()
         );
 
-        // 2. 카톡 나에게 보내기 발송
-        boolean success = kakaoMessageService.sendWelstoryMenuToMe(setting.getKakaoAccessToken(), menu, setting.getCotNo(), setting.getHallNo());
+        // 2. 알림 설정 시간에 해당하는 식단만 필터링!
+        WelstoryMenuService.WelstoryMenuResult filteredMenu = menuService.filterMenuByTime(menu, setting.getScheduledTime());
+
+        // 3. 카톡 나에게 보내기 발송
+        boolean success = kakaoMessageService.sendWelstoryMenuToMe(setting.getKakaoAccessToken(), filteredMenu, setting.getCotNo(), setting.getHallNo());
         
         if (!success) {
             // 토큰 갱신 시도
@@ -54,7 +57,7 @@ public class WelstoryAlertService implements WelstoryAlertUseCase {
             welstoryAlertPort.save(setting);
 
             // 재발송 시도
-            success = kakaoMessageService.sendWelstoryMenuToMe(setting.getKakaoAccessToken(), menu, setting.getCotNo(), setting.getHallNo());
+            success = kakaoMessageService.sendWelstoryMenuToMe(setting.getKakaoAccessToken(), filteredMenu, setting.getCotNo(), setting.getHallNo());
         }
         return success;
     }

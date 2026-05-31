@@ -123,6 +123,56 @@ public class WelstoryMenuService {
         }
     }
 
+    /**
+     * 알림 시간대별로 식단을 필터링하여 매칭되는 식단만 반환합니다.
+     * 아침: 00:00 ~ 08:59 (hour < 9)
+     * 점심: 09:00 ~ 12:59 (hour >= 9 && hour < 13)
+     * 저녁/야식: 13:00 ~ 23:59 (hour >= 13)
+     */
+    public WelstoryMenuResult filterMenuByTime(WelstoryMenuResult menu, String scheduledTime) {
+        if (menu == null || menu.getCourses() == null || menu.getCourses().isEmpty()) {
+            return menu;
+        }
+
+        String targetLabel = "점심"; // 기본값
+        try {
+            if (scheduledTime != null && scheduledTime.contains(":")) {
+                String[] parts = scheduledTime.split(":");
+                int hour = Integer.parseInt(parts[0]);
+                if (hour < 9) {
+                    targetLabel = "아침";
+                } else if (hour >= 13) {
+                    targetLabel = "저녁";
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse scheduledTime: {}, defaulting to 점심", scheduledTime, e);
+        }
+
+        log.info("Filtering courses for cafeteria: {} matching time label: '{}' (Scheduled: {})", 
+            menu.getCafeteriaName(), targetLabel, scheduledTime);
+
+        List<CourseMenu> filteredCourses = new ArrayList<>();
+        String searchSuffix = "(" + targetLabel + ")";
+        for (CourseMenu course : menu.getCourses()) {
+            if (course.getCourseName() != null && course.getCourseName().contains(searchSuffix)) {
+                filteredCourses.add(course);
+            }
+        }
+
+        // 안전장치(Fallback): 필터링 결과가 비어있다면 원본 메뉴를 그대로 반환
+        if (filteredCourses.isEmpty()) {
+            log.warn("No courses matched the filter '{}'. Returning original courses as fallback.", targetLabel);
+            return menu;
+        }
+
+        return WelstoryMenuResult.builder()
+            .cafeteriaName(menu.getCafeteriaName())
+            .dateStr(menu.getDateStr())
+            .courses(filteredCourses)
+            .build();
+    }
+
     private WelstoryMenuResult parseWelplanMenus(String jsonStr, String cafeteriaName, String yyyyMMdd) {
         try {
             ObjectMapper mapper = new ObjectMapper();
