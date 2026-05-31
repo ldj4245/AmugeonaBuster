@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Flame, Compass, Users, Sparkles, MapPin, ArrowRight, CheckCircle2, RefreshCw, Phone, Info, AlertCircle, Copy, X, Settings } from 'lucide-react';
+import { Flame, Compass, Users, Sparkles, MapPin, ArrowRight, CheckCircle2, RefreshCw, Phone, Info, AlertCircle, Copy, X, Settings, Star, MessageSquare } from 'lucide-react';
 import TinderCard from 'react-tinder-card';
 import { useWebSocket, WebSocketRoomResponse } from './hooks/useWebSocket';
 import { KakaoMap } from './components/KakaoMap';
@@ -150,6 +150,18 @@ function App() {
   const [menuDetailHallNo, setMenuDetailHallNo] = useState('');
   const [menuMealFilter, setMenuMealFilter] = useState<'all' | 'breakfast' | 'lunch' | 'dinner'>('all');
 
+  // ⭐ 웰스토리 식단별 별점 및 한줄평 후기 관련 상태 변수
+  const [reviewStats, setReviewStats] = useState<Record<string, { averageRating: number; reviewCount: number }>>({});
+  const [expandedReviewCourseName, setExpandedReviewCourseName] = useState<string | null>(null);
+  const [courseReviews, setCourseReviews] = useState<any[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [activeReviewWriteCourseName, setActiveReviewWriteCourseName] = useState<string | null>(null);
+  const [newReviewRating, setNewReviewRating] = useState(5);
+  const [newReviewComment, setNewReviewComment] = useState('');
+  const [newReviewNickname, setNewReviewNickname] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [submittedReviewCourses, setSubmittedReviewCourses] = useState<Record<string, boolean>>({});
+
   // 🎮 커피빵 내기 미니게임 관련 상태 변수
   const [isCoffeeGameOpen, setIsCoffeeGameOpen] = useState(false);
   const [playerCount, setPlayerCount] = useState(4);
@@ -267,10 +279,123 @@ function App() {
       setMenuDetailCafeteriaName(data.cafeteriaName || name);
       setMenuDetailDate(data.dateStr || '오늘');
       setMenuDetailCourses(data.courses || []);
+      // 💬 식단 조회 성공 시 해당 날짜/지점의 별점 평점 현황도 같이 로드!
+      fetchReviewStats(data.cafeteriaName || name, data.dateStr || '오늘');
     } catch (err: any) {
       setMenuDetailError(err.message || '식단 정보 수집 도중 예상치 못한 오류가 발생했습니다.');
     } finally {
       setMenuDetailLoading(false);
+    }
+  };
+
+  // ⭐ 웰스토리 지점/날짜별 누적 평점 통계 획득 API 연동
+  const fetchReviewStats = async (cafeteriaName: string, date: string) => {
+    try {
+      const formattedDate = date && date !== '오늘' ? date : new Date().toISOString().split('T')[0];
+      const res = await fetch(`/api/welstory/reviews/stats?cafeteriaName=${encodeURIComponent(cafeteriaName)}&menuDate=${formattedDate}`);
+      if (res.ok) {
+        const stats = await res.json();
+        setReviewStats(stats || {});
+      }
+    } catch (e) {
+      console.error('Failed to load review stats', e);
+    }
+  };
+
+  // 💬 특정 식단의 한줄평 목록 로드 API 연동
+  const fetchCourseReviews = async (cafeteriaName: string, date: string) => {
+    setLoadingReviews(true);
+    try {
+      const formattedDate = date && date !== '오늘' ? date : new Date().toISOString().split('T')[0];
+      const res = await fetch(`/api/welstory/reviews?cafeteriaName=${encodeURIComponent(cafeteriaName)}&menuDate=${formattedDate}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCourseReviews(data || []);
+      }
+    } catch (e) {
+      console.error('Failed to load reviews', e);
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
+
+  // 한줄평 작성 창 열기 핸들러
+  const handleOpenReviewWrite = (courseName: string) => {
+    setActiveReviewWriteCourseName(courseName);
+    // 닉네임 기본 세팅 (카카오 가입자 정보가 있으면 그것을, 없으면 귀여운 사내 닉네임 임시 추천)
+    const kakaoNickname = welstorySettings?.nickname;
+    if (kakaoNickname) {
+      setNewReviewNickname(kakaoNickname);
+    } else {
+      const adjectives = ['배고픈', '든든한', '행복한', '바쁜', '신선한', '피곤한', '열정적인'];
+      const nouns = ['사우', '프로', '디자이너', '엔지니어', '웰스토리러', '동료'];
+      const randAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
+      const randNoun = nouns[Math.floor(Math.random() * nouns.length)];
+      const randNum = Math.floor(Math.random() * 900) + 100;
+      setNewReviewNickname(`${randAdj} ${randNoun} ${randNum}`);
+    }
+    setNewReviewRating(5);
+    setNewReviewComment('');
+  };
+
+  // 🚀 한줄평 등록 제출 API 연동
+  const handleReviewSubmit = async (courseName: string, menuDetails: string) => {
+    if (!newReviewComment.trim()) {
+      alert('한줄평 내용을 입력해 주세요.');
+      return;
+    }
+    setSubmittingReview(true);
+    const formattedDate = menuDetailDate && menuDetailDate !== '오늘' ? menuDetailDate : new Date().toISOString().split('T')[0];
+    try {
+      let fingerprint = localStorage.getItem('user_fingerprint');
+      if (!fingerprint) {
+        fingerprint = 'fingerprint-' + Math.random().toString(36).substring(2, 15) + '-' + Date.now();
+        localStorage.setItem('user_fingerprint', fingerprint);
+      }
+
+      const nicknameToUse = newReviewNickname.trim() || '익명의 사우';
+
+      const payload = {
+        cafeteriaName: menuDetailCafeteriaName,
+        menuDate: formattedDate,
+        courseName: courseName,
+        menuDetails: menuDetails,
+        nickname: nicknameToUse,
+        rating: newReviewRating,
+        comment: newReviewComment.trim(),
+        userFingerprint: fingerprint
+      };
+
+      const res = await fetch('/api/welstory/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || '후기 제출에 실패했습니다.');
+      }
+
+      // 로컬 중복 제출 체크 등록
+      setSubmittedReviewCourses(prev => ({
+        ...prev,
+        [`${menuDetailCafeteriaName}-${formattedDate}-${courseName}`]: true
+      }));
+
+      // 작성 폼 닫기 및 필드 초기화
+      setNewReviewComment('');
+      setActiveReviewWriteCourseName(null);
+
+      // 통계와 리스트 즉각 실시간 새로고침!
+      await fetchReviewStats(menuDetailCafeteriaName, menuDetailDate);
+      await fetchCourseReviews(menuDetailCafeteriaName, menuDetailDate);
+
+      alert('한줄평 후기가 성공적으로 등록되었습니다! 🎉');
+    } catch (e: any) {
+      alert(e.message || '후기 등록에 실패했습니다. 다시 시도해 주세요.');
+    } finally {
+      setSubmittingReview(false);
     }
   };
 
@@ -2221,11 +2346,27 @@ function App() {
                                     <span>{courseEmoji}</span>
                                     {course.courseName}
                                   </span>
-                                  {course.price && (
-                                    <span className="text-xs font-bold text-zinc-600 bg-zinc-100/80 border border-zinc-200/40 px-3 py-1.5 rounded-xl font-mono shadow-xs">
-                                      💰 {course.price}
-                                    </span>
-                                  )}
+                                  <div className="flex items-center gap-1.5 select-none">
+                                    {course.price && (
+                                      <span className="text-xs font-bold text-zinc-600 bg-zinc-100/80 border border-zinc-200/40 px-3 py-1.5 rounded-xl font-mono shadow-xs">
+                                        💰 {course.price}
+                                      </span>
+                                    )}
+                                    <button
+                                      onClick={() => {
+                                        const isOpen = expandedReviewCourseName === course.courseName;
+                                        setExpandedReviewCourseName(isOpen ? null : course.courseName);
+                                        if (!isOpen) {
+                                          fetchCourseReviews(menuDetailCafeteriaName, menuDetailDate);
+                                        }
+                                      }}
+                                      className="text-xs font-black text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/50 px-3 py-1.5 rounded-xl flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+                                    >
+                                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
+                                      <span>{reviewStats[course.courseName]?.averageRating || '0.0'}</span>
+                                      <span className="text-zinc-400 text-[10px] font-normal">({reviewStats[course.courseName]?.reviewCount || 0})</span>
+                                    </button>
+                                  </div>
                                 </div>
 
                                 <div className="relative w-full h-44 rounded-2xl overflow-hidden bg-zinc-100 shadow-inner border border-zinc-100">
@@ -2269,7 +2410,7 @@ function App() {
                               </div>
 
                               {course.calories > 0 && (
-                                <div className="border-t border-zinc-100 pt-4 flex flex-col gap-1.5">
+                                <div className="border-t border-zinc-100 pt-3 flex flex-col gap-1.5">
                                   <div className="flex items-center justify-between text-[11px] font-black text-zinc-400">
                                     <span className="flex items-center gap-1">🔥 총 칼로리</span>
                                     <span className="font-mono text-zinc-700 text-xs font-bold">{course.calories} kcal</span>
@@ -2282,6 +2423,154 @@ function App() {
                                   </div>
                                 </div>
                               )}
+
+                              {/* ⭐ 한줄평 후기 시스템 UI 영역 */}
+                              <div className="border-t border-zinc-100 pt-4 flex flex-col gap-3">
+                                <div className="flex items-center justify-between gap-2">
+                                  <button
+                                    onClick={() => {
+                                      const isOpen = expandedReviewCourseName === course.courseName;
+                                      setExpandedReviewCourseName(isOpen ? null : course.courseName);
+                                      if (!isOpen) {
+                                        fetchCourseReviews(menuDetailCafeteriaName, menuDetailDate);
+                                      }
+                                    }}
+                                    className="text-[11px] font-black text-zinc-500 hover:text-zinc-700 flex items-center gap-1 transition-colors cursor-pointer select-none"
+                                  >
+                                    <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+                                    <span>한줄평 보기 ({reviewStats[course.courseName]?.reviewCount || 0})</span>
+                                    <span className="text-[10px] text-zinc-400 font-bold">
+                                      {expandedReviewCourseName === course.courseName ? '▼' : '▶'}
+                                    </span>
+                                  </button>
+                                  
+                                  {!submittedReviewCourses[`${menuDetailCafeteriaName}-${menuDetailDate}-${course.courseName}`] ? (
+                                    <button
+                                      onClick={() => {
+                                        if (activeReviewWriteCourseName === course.courseName) {
+                                          setActiveReviewWriteCourseName(null);
+                                        } else {
+                                          handleOpenReviewWrite(course.courseName);
+                                        }
+                                      }}
+                                      className="text-[10px] font-black text-white bg-orange-500 hover:bg-orange-600 px-3 py-1.5 rounded-xl flex items-center gap-1 shadow-sm transition-all cursor-pointer select-none"
+                                    >
+                                      ✍️ 후기 남기기
+                                    </button>
+                                  ) : (
+                                    <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-xl select-none">
+                                      👍 평가 완료
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* 1) 후기 작성 폼 영역 */}
+                                {activeReviewWriteCourseName === course.courseName && (
+                                  <div className="bg-slate-50/70 border border-zinc-200/60 p-4 rounded-2xl flex flex-col gap-3.5 animate-slide-down shadow-inner">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="text-[10px] font-black text-zinc-700">✍️ 오늘의 식단 한줄평</span>
+                                      {/* 1~5점 황금 별 선택 */}
+                                      <div className="flex items-center gap-1">
+                                        {[1, 2, 3, 4, 5].map((num) => (
+                                          <button
+                                            key={num}
+                                            type="button"
+                                            onClick={() => setNewReviewRating(num)}
+                                            className="focus:outline-hidden cursor-pointer p-0.5"
+                                          >
+                                            <Star
+                                              className={`w-4 h-4 transition-colors ${
+                                                num <= newReviewRating ? 'fill-amber-400 text-amber-400' : 'text-zinc-300'
+                                              }`}
+                                            />
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                      <div className="flex flex-col gap-1 w-2/5">
+                                        <span className="text-[9px] font-black text-zinc-400 tracking-wider">닉네임</span>
+                                        <input
+                                          type="text"
+                                          value={newReviewNickname}
+                                          onChange={(e) => setNewReviewNickname(e.target.value.substring(0, 15))}
+                                          className="bg-white border border-zinc-200 rounded-xl px-2.5 py-1.5 text-[11px] font-extrabold text-zinc-700 focus:outline-hidden focus:border-orange-400 shadow-2xs"
+                                          placeholder="익명의 사우"
+                                        />
+                                      </div>
+                                      <div className="flex flex-col gap-1 w-3/5">
+                                        <span className="text-[9px] font-black text-zinc-400 tracking-wider">별점</span>
+                                        <span className="text-[11px] font-black text-amber-600 px-1 py-1.5">{newReviewRating}점 만점! ⭐</span>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex flex-col gap-1">
+                                      <span className="text-[9px] font-black text-zinc-400 tracking-wider">후기 내용 (최대 100자)</span>
+                                      <textarea
+                                        value={newReviewComment}
+                                        onChange={(e) => setNewReviewComment(e.target.value.substring(0, 100))}
+                                        className="bg-white border border-zinc-200 rounded-xl p-2.5 text-[11px] font-bold text-zinc-700 focus:outline-hidden focus:border-orange-400 shadow-2xs h-16 resize-none"
+                                        placeholder="오늘 식단 어땠나요? 반찬 구성, 간, 맛에 대한 생생한 후기를 남겨주세요."
+                                      />
+                                      <div className="flex items-center justify-between text-[9px] font-bold text-zinc-400 px-1 mt-0.5">
+                                        <span>{newReviewComment.length} / 100자</span>
+                                        <button
+                                          onClick={() => handleReviewSubmit(course.courseName, course.menuDetails)}
+                                          disabled={submittingReview}
+                                          className="px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-900 text-white rounded-lg transition-colors font-black flex items-center gap-1 shadow-xs cursor-pointer disabled:opacity-50"
+                                        >
+                                          {submittingReview ? '등록 중...' : '후기 등록 🚀'}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* 2) 한줄평 목록 리스트업 영역 (아코디언 형태) */}
+                                {expandedReviewCourseName === course.courseName && (
+                                  <div className="bg-slate-50/40 border border-zinc-100 p-3 rounded-2xl flex flex-col gap-2.5 animate-slide-down max-h-56 overflow-y-auto overscroll-contain shadow-inner">
+                                    {loadingReviews ? (
+                                      <div className="text-center py-6 text-zinc-400 font-bold text-[10px] flex items-center justify-center gap-1.5">
+                                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-orange-500" />
+                                        <span>최신 한줄평 불러오는 중...</span>
+                                      </div>
+                                    ) : (
+                                      (() => {
+                                        const reviewsForCourse = courseReviews.filter((r: any) => r.courseName === course.courseName);
+                                        if (reviewsForCourse.length === 0) {
+                                          return (
+                                            <div className="text-center py-6 text-zinc-400 font-extrabold text-[10px] leading-relaxed">
+                                              📢 아직 오늘 작성된 한줄평 후기가 없습니다.<br />
+                                              <span className="text-orange-500 font-black">오늘 첫 번째 후기의 주인공이 되어주세요! ✍️</span>
+                                            </div>
+                                          );
+                                        }
+                                        return reviewsForCourse.map((review: any) => (
+                                          <div key={review.id} className="bg-white border border-zinc-100 p-2.5 rounded-xl shadow-2xs flex flex-col gap-1.5 animate-fade-in">
+                                            <div className="flex items-center justify-between gap-2 text-[10px]">
+                                              <div className="flex items-center gap-1.5">
+                                                <span className="font-extrabold text-zinc-700">{review.nickname}</span>
+                                                <span className="text-zinc-300 font-normal">|</span>
+                                                <div className="flex items-center gap-0.5 text-amber-500 font-black">
+                                                  <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
+                                                  <span>{review.rating}</span>
+                                                </div>
+                                              </div>
+                                              <span className="text-zinc-400 text-[9px] font-medium">
+                                                {new Date(review.createdAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                                              </span>
+                                            </div>
+                                            <p className="text-[11px] font-bold text-zinc-600 leading-relaxed pl-1.5 border-l-2 border-orange-200">
+                                              {review.comment}
+                                            </p>
+                                          </div>
+                                        ));
+                                      })()
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
