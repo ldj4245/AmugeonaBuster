@@ -1,8 +1,8 @@
 package com.amugeonabuster.application.service;
 
-import com.amugeonabuster.adapter.out.persistence.SpringDataWelstoryMenuReviewRepository;
-import com.amugeonabuster.adapter.out.persistence.WelstoryMenuReviewJpaEntity;
 import com.amugeonabuster.application.port.in.WelstoryMenuReviewUseCase;
+import com.amugeonabuster.application.port.out.WelstoryMenuReviewPort;
+import com.amugeonabuster.domain.model.WelstoryMenuReview;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,13 +21,13 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class WelstoryMenuReviewService implements WelstoryMenuReviewUseCase {
 
-    private final SpringDataWelstoryMenuReviewRepository repository;
+    private final WelstoryMenuReviewPort reviewPort;
 
     @Override
     @Transactional
-    public WelstoryMenuReviewJpaEntity submitReview(SubmitReviewCommand command) {
+    public WelstoryMenuReview submitReview(SubmitReviewCommand command) {
         // 도배 차단 (1 브라우저 세션당 특정 코스에 대해 당일 딱 1회만 등록 허용)
-        boolean alreadySubmitted = repository.existsByCafeteriaNameAndMenuDateAndCourseNameAndUserFingerprint(
+        boolean alreadySubmitted = reviewPort.existsByCafeteriaNameAndMenuDateAndCourseNameAndUserFingerprint(
             command.getCafeteriaName(),
             command.getMenuDate(),
             command.getCourseName(),
@@ -38,7 +38,7 @@ public class WelstoryMenuReviewService implements WelstoryMenuReviewUseCase {
             throw new IllegalArgumentException("이미 오늘 해당 코스 식단에 후기를 등록하셨습니다.");
         }
 
-        WelstoryMenuReviewJpaEntity entity = WelstoryMenuReviewJpaEntity.builder()
+        WelstoryMenuReview review = WelstoryMenuReview.builder()
             .cafeteriaName(command.getCafeteriaName())
             .menuDate(command.getMenuDate())
             .courseName(command.getCourseName())
@@ -51,27 +51,27 @@ public class WelstoryMenuReviewService implements WelstoryMenuReviewUseCase {
             .build();
 
         log.info("Saving new Welstory review for cafeteria: {}, course: {}, rating: {} by {}",
-            entity.getCafeteriaName(), entity.getCourseName(), entity.getRating(), entity.getNickname());
+            review.getCafeteriaName(), review.getCourseName(), review.getRating(), review.getNickname());
 
-        return repository.save(entity);
+        return reviewPort.save(review);
     }
 
     @Override
-    public List<WelstoryMenuReviewJpaEntity> getReviews(String cafeteriaName, LocalDate menuDate) {
-        return repository.findAllByCafeteriaNameAndMenuDateOrderByCreatedAtDesc(cafeteriaName, menuDate);
+    public List<WelstoryMenuReview> getReviews(String cafeteriaName, LocalDate menuDate) {
+        return reviewPort.findAllByCafeteriaNameAndMenuDate(cafeteriaName, menuDate);
     }
 
     @Override
     public Map<String, CourseStats> getCourseStats(String cafeteriaName, LocalDate menuDate) {
-        List<WelstoryMenuReviewJpaEntity> reviews = repository.findAllByCafeteriaNameAndMenuDateOrderByCreatedAtDesc(cafeteriaName, menuDate);
+        List<WelstoryMenuReview> reviews = reviewPort.findAllByCafeteriaNameAndMenuDate(cafeteriaName, menuDate);
 
-        Map<String, List<WelstoryMenuReviewJpaEntity>> grouped = reviews.stream()
-            .collect(Collectors.groupingBy(WelstoryMenuReviewJpaEntity::getCourseName));
+        Map<String, List<WelstoryMenuReview>> grouped = reviews.stream()
+            .collect(Collectors.groupingBy(WelstoryMenuReview::getCourseName));
 
         Map<String, CourseStats> statsMap = new HashMap<>();
-        for (Map.Entry<String, List<WelstoryMenuReviewJpaEntity>> entry : grouped.entrySet()) {
+        for (Map.Entry<String, List<WelstoryMenuReview>> entry : grouped.entrySet()) {
             double avg = entry.getValue().stream()
-                .mapToInt(WelstoryMenuReviewJpaEntity::getRating)
+                .mapToInt(WelstoryMenuReview::getRating)
                 .average()
                 .orElse(0.0);
             int count = entry.getValue().size();

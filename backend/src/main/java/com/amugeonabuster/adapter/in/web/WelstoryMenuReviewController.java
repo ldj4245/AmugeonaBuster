@@ -1,6 +1,6 @@
 package com.amugeonabuster.adapter.in.web;
 
-import com.amugeonabuster.adapter.out.persistence.WelstoryMenuReviewJpaEntity;
+import com.amugeonabuster.domain.model.WelstoryMenuReview;
 import com.amugeonabuster.application.port.in.WelstoryMenuReviewUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -31,7 +31,7 @@ public class WelstoryMenuReviewController {
                 .userFingerprint(request.getUserFingerprint())
                 .build();
 
-            WelstoryMenuReviewJpaEntity saved = reviewUseCase.submitReview(command);
+            WelstoryMenuReview saved = reviewUseCase.submitReview(command);
             return ResponseEntity.ok(saved);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
@@ -39,7 +39,7 @@ public class WelstoryMenuReviewController {
     }
 
     @GetMapping
-    public ResponseEntity<List<WelstoryMenuReviewJpaEntity>> getReviews(
+    public ResponseEntity<List<WelstoryMenuReview>> getReviews(
             @RequestParam("cafeteriaName") String cafeteriaName,
             @RequestParam("menuDate") String menuDate) {
         return ResponseEntity.ok(reviewUseCase.getReviews(cafeteriaName, LocalDate.parse(menuDate)));
