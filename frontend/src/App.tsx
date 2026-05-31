@@ -288,10 +288,22 @@ function App() {
     }
   };
 
+  // 📅 날짜 문자열을 YYYY-MM-DD ISO 형식으로 표준화하는 헬퍼 함수 (한글 날짜 헤더 등 예외 대응)
+  const getIsoDateString = (date: string) => {
+    if (date && date.includes('-') && date.length === 10) {
+      return date;
+    }
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // ⭐ 웰스토리 지점/날짜별 누적 평점 통계 획득 API 연동
   const fetchReviewStats = async (cafeteriaName: string, date: string) => {
     try {
-      const formattedDate = date && date !== '오늘' ? date : new Date().toISOString().split('T')[0];
+      const formattedDate = getIsoDateString(date);
       const res = await fetch(`/api/welstory/reviews/stats?cafeteriaName=${encodeURIComponent(cafeteriaName)}&menuDate=${formattedDate}`);
       if (res.ok) {
         const stats = await res.json();
@@ -306,7 +318,7 @@ function App() {
   const fetchCourseReviews = async (cafeteriaName: string, date: string) => {
     setLoadingReviews(true);
     try {
-      const formattedDate = date && date !== '오늘' ? date : new Date().toISOString().split('T')[0];
+      const formattedDate = getIsoDateString(date);
       const res = await fetch(`/api/welstory/reviews?cafeteriaName=${encodeURIComponent(cafeteriaName)}&menuDate=${formattedDate}`);
       if (res.ok) {
         const data = await res.json();
@@ -345,7 +357,7 @@ function App() {
       return;
     }
     setSubmittingReview(true);
-    const formattedDate = menuDetailDate && menuDetailDate !== '오늘' ? menuDetailDate : new Date().toISOString().split('T')[0];
+    const formattedDate = getIsoDateString(menuDetailDate);
     try {
       let fingerprint = localStorage.getItem('user_fingerprint');
       if (!fingerprint) {
