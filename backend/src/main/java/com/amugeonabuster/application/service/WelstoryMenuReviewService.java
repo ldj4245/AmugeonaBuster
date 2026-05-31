@@ -47,7 +47,7 @@ public class WelstoryMenuReviewService implements WelstoryMenuReviewUseCase {
             .rating(command.getRating())
             .comment(command.getComment())
             .userFingerprint(command.getUserFingerprint())
-            .createdAt(LocalDateTime.now())
+            .createdAt(LocalDateTime.now(java.time.ZoneId.of("Asia/Seoul")))
             .build();
 
         log.info("Saving new Welstory review for cafeteria: {}, course: {}, rating: {} by {}",
