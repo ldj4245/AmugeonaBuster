@@ -274,6 +274,22 @@ function App() {
     }
   };
 
+  // 🛡️ 모달 오픈 시 모바일 배경 스크롤 누수 차단 (Body Scroll Lock)
+  useEffect(() => {
+    const isAnyModalOpen = isWelstoryModalOpen || isMenuDetailOpen || isCoffeeGameOpen;
+    if (isAnyModalOpen) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'relative'; // iOS Safari 호환용 포지션 설정
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+    };
+  }, [isWelstoryModalOpen, isMenuDetailOpen, isCoffeeGameOpen]);
+
   // URL 파라미터 감지 및 자동 기동 효과
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -1987,7 +2003,7 @@ function App() {
 
       {/* 🍱 웰스토리 실시간 전체 식단표 프리미엄 뷰어 모달 */}
       {isMenuDetailOpen && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto overscroll-contain">
           <div className="bg-slate-50 border border-zinc-200 rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] scale-100 transition-all duration-300">
             
             {/* 1. 프리미엄 배너 헤더 */}
@@ -2156,7 +2172,7 @@ function App() {
                   }
 
                   return (
-                    <div className="overflow-y-auto p-5 sm:p-8 flex-grow bg-slate-50/50">
+                    <div className="overflow-y-auto overscroll-contain p-5 sm:p-8 flex-grow bg-slate-50/50">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {filteredCourses.map((course: any, idx: number) => {
                           const { badgeGradient, courseEmoji } = getCourseStyle(course.courseName);
