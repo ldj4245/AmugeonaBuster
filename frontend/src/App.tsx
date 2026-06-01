@@ -161,6 +161,7 @@ function App() {
   const [newReviewNickname, setNewReviewNickname] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
   const [submittedReviewCourses, setSubmittedReviewCourses] = useState<Record<string, boolean>>({});
+  const [isReviewInputFocused, setIsReviewInputFocused] = useState(false);
 
   // 🎮 커피빵 내기 미니게임 관련 상태 변수
   const [isCoffeeGameOpen, setIsCoffeeGameOpen] = useState(false);
@@ -398,6 +399,7 @@ function App() {
       // 작성 폼 닫기 및 필드 초기화
       setNewReviewComment('');
       setActiveReviewWriteCourseName(null);
+      setIsReviewInputFocused(false);
 
       // 통계와 리스트 즉각 실시간 새로고침!
       await fetchReviewStats(menuDetailCafeteriaName, menuDetailDate);
@@ -2157,8 +2159,12 @@ function App() {
 
       {/* 🍱 웰스토리 실시간 전체 식단표 프리미엄 뷰어 모달 */}
       {isMenuDetailOpen && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto overscroll-contain">
-          <div className="bg-slate-50 border border-zinc-200 rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] scale-100 transition-all duration-300">
+        <div className={`fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex justify-center p-4 overflow-y-auto overscroll-contain transition-all duration-300 ${
+          isReviewInputFocused ? 'items-start pt-2 pb-64 sm:items-center sm:pt-4 sm:pb-4' : 'items-center'
+        }`}>
+          <div className={`bg-slate-50 border border-zinc-200 rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col scale-100 transition-all duration-300 ${
+            isReviewInputFocused ? 'max-h-[85vh] sm:max-h-[90vh]' : 'max-h-[90vh]'
+          }`}>
             
             {/* 1. 프리미엄 배너 헤더 */}
             <div className="bg-gradient-to-br from-orange-500 via-amber-500 to-red-500 text-white p-6 sm:p-8 relative flex flex-col gap-2 shrink-0 shadow-lg">
@@ -2168,6 +2174,7 @@ function App() {
                   onClick={() => {
                     setIsMenuDetailOpen(false);
                     setIsWelstoryModalOpen(true);
+                    setIsReviewInputFocused(false);
                   }}
                   title="알림 주기 및 지점 변경 설정"
                   className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center shadow-xs"
@@ -2176,7 +2183,10 @@ function App() {
                 </button>
                 {/* 창 닫기 */}
                 <button 
-                  onClick={() => setIsMenuDetailOpen(false)}
+                  onClick={() => {
+                    setIsMenuDetailOpen(false);
+                    setIsReviewInputFocused(false);
+                  }}
                   title="메뉴판 닫기"
                   className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center shadow-xs"
                 >
@@ -2461,6 +2471,7 @@ function App() {
                                       onClick={() => {
                                         if (activeReviewWriteCourseName === course.courseName) {
                                           setActiveReviewWriteCourseName(null);
+                                          setIsReviewInputFocused(false);
                                         } else {
                                           handleOpenReviewWrite(course.courseName);
                                         }
@@ -2507,6 +2518,13 @@ function App() {
                                           type="text"
                                           value={newReviewNickname}
                                           onChange={(e) => setNewReviewNickname(e.target.value.substring(0, 15))}
+                                          onFocus={() => {
+                                            setIsReviewInputFocused(true);
+                                            setTimeout(() => {
+                                              document.activeElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                            }, 150);
+                                          }}
+                                          onBlur={() => setIsReviewInputFocused(false)}
                                           className="bg-white border border-zinc-200 rounded-xl px-2.5 py-1.5 text-[11px] font-extrabold text-zinc-700 focus:outline-hidden focus:border-orange-400 shadow-2xs"
                                           placeholder="익명의 사우"
                                         />
@@ -2522,6 +2540,13 @@ function App() {
                                       <textarea
                                         value={newReviewComment}
                                         onChange={(e) => setNewReviewComment(e.target.value.substring(0, 100))}
+                                        onFocus={() => {
+                                          setIsReviewInputFocused(true);
+                                          setTimeout(() => {
+                                            document.activeElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                          }, 150);
+                                        }}
+                                        onBlur={() => setIsReviewInputFocused(false)}
                                         className="bg-white border border-zinc-200 rounded-xl p-2.5 text-[11px] font-bold text-zinc-700 focus:outline-hidden focus:border-orange-400 shadow-2xs h-16 resize-none"
                                         placeholder="오늘 식단 어땠나요? 반찬 구성, 간, 맛에 대한 생생한 후기를 남겨주세요."
                                       />
@@ -2587,6 +2612,9 @@ function App() {
                           );
                         })}
                       </div>
+                      {isReviewInputFocused && (
+                        <div className="h-72 sm:h-0 w-full shrink-0 transition-all duration-300" />
+                      )}
                     </div>
                   );
                 })()}
@@ -2597,7 +2625,10 @@ function App() {
                 📢 <span className="text-orange-600">주말/공휴일에는 구내식당이 휴무</span>이므로, 지점 변경 테스트를 원활히 돕기 위해 각 지점별 시그니처 힐링 모의 식단(수원 갈비탕, 서초 규동 등)이 동적으로 로드됩니다! 평일에는 실제 라이브 데이터가 실시간으로 수집됩니다.
               </span>
               <button 
-                onClick={() => setIsMenuDetailOpen(false)}
+                onClick={() => {
+                  setIsMenuDetailOpen(false);
+                  setIsReviewInputFocused(false);
+                }}
                 className="px-4 py-2 bg-zinc-800 hover:bg-zinc-900 text-white rounded-lg transition-colors cursor-pointer shrink-0 align-self-end sm:align-self-auto"
               >
                 닫기
