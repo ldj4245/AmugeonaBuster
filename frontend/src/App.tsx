@@ -2353,14 +2353,14 @@ function App() {
                               <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${badgeGradient}`} />
 
                               <div className="flex flex-col gap-4">
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className={`text-xs font-black tracking-tight text-white bg-gradient-to-r ${badgeGradient} px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm`}>
-                                    <span>{courseEmoji}</span>
-                                    {course.courseName}
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between items-start gap-3 w-full">
+                                  <span className={`text-xs font-black tracking-tight text-white bg-gradient-to-r ${badgeGradient} px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-sm w-full sm:w-auto whitespace-normal break-all`}>
+                                    <span className="shrink-0">{courseEmoji}</span>
+                                    <span>{course.courseName}</span>
                                   </span>
-                                  <div className="flex items-center gap-1.5 select-none">
+                                  <div className="flex items-center gap-1.5 select-none w-full sm:w-auto justify-start sm:justify-end">
                                     {course.price && (
-                                      <span className="text-xs font-bold text-zinc-600 bg-zinc-100/80 border border-zinc-200/40 px-3 py-1.5 rounded-xl font-mono shadow-xs">
+                                      <span className="text-xs font-bold text-zinc-600 bg-zinc-100/80 border border-zinc-200/40 px-3 py-1.5 rounded-xl font-mono shadow-xs whitespace-nowrap shrink-0">
                                         💰 {course.price}
                                       </span>
                                     )}
@@ -2372,7 +2372,7 @@ function App() {
                                           fetchCourseReviews(menuDetailCafeteriaName, menuDetailDate);
                                         }
                                       }}
-                                      className="text-xs font-black text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/50 px-3 py-1.5 rounded-xl flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+                                      className="text-xs font-black text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/50 px-3 py-1.5 rounded-xl flex items-center gap-1 shadow-xs transition-colors cursor-pointer whitespace-nowrap shrink-0"
                                     >
                                       <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
                                       <span>{reviewStats[course.courseName]?.averageRating || '0.0'}</span>
