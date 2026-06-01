@@ -182,6 +182,12 @@ public class WelstoryMenuService {
 
     private WelstoryMenuResult parseWelplanMenus(String jsonStr, String cafeteriaName, String yyyyMMdd) {
         try {
+            if (jsonStr != null) {
+                // 💡 Jackson 파서 오류(소수점 시작 소수 허용 안됨) 방지를 위한 전처리
+                // 자바스크립트 객체의 .5, .12 등 소수점을 0.5, 0.12로 보정
+                jsonStr = jsonStr.replaceAll("(?<=[:,\\[\\s])\\.(\\d+)", "0.$1");
+            }
+            
             ObjectMapper mapper = new ObjectMapper();
             mapper.configure(com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES, true);
             mapper.configure(com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_SINGLE_QUOTES, true);
