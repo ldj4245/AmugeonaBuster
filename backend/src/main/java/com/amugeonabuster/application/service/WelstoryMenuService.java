@@ -69,12 +69,19 @@ public class WelstoryMenuService {
             String searchRes = searchBytes != null ? new String(searchBytes, java.nio.charset.StandardCharsets.UTF_8) : null;
             String restaurantId = null;
             
-            if (searchRes != null && searchRes.startsWith("[")) {
+            if (searchRes != null && !searchRes.isEmpty()) {
                 ObjectMapper mapper = new ObjectMapper();
-                JsonNode searchNode = mapper.readTree(searchRes);
-                if (searchNode.isArray() && searchNode.size() > 0) {
-                    restaurantId = searchNode.get(0).get("id").asText();
-                    log.info("Found Welplan restaurant mapping. ID: {}, Name: {}", restaurantId, searchNode.get(0).get("name").asText());
+                JsonNode rootNode = mapper.readTree(searchRes);
+                JsonNode arrayNode = null;
+                if (rootNode.isArray()) {
+                    arrayNode = rootNode;
+                } else if (rootNode.has("value") && rootNode.get("value").isArray()) {
+                    arrayNode = rootNode.get("value");
+                }
+                
+                if (arrayNode != null && arrayNode.size() > 0) {
+                    restaurantId = arrayNode.get(0).get("id").asText();
+                    log.info("Found Welplan restaurant mapping. ID: {}, Name: {}", restaurantId, arrayNode.get(0).get("name").asText());
                 }
             }
             
@@ -82,8 +89,8 @@ public class WelstoryMenuService {
                 restaurantId = "REST000039"; // DSR 기본값
             }
             
-            // 2. 쿠키를 실어서 takein 식단 조회
-            String targetUrl = "https://welplan.pmh.codes/takein?date=" + yyyyMMdd;
+            // 2. 쿠키를 실어서 takein 식단 조회 (302 리다이렉션을 피하기 위해 직접 /all 로 요청)
+            String targetUrl = "https://welplan.pmh.codes/takein/" + yyyyMMdd + "/all";
             log.info("Requesting Welplan takein page: {}", targetUrl);
             
             org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
@@ -184,6 +191,7 @@ public class WelstoryMenuService {
             }
             
             List<CourseMenu> courses = new ArrayList<>();
+            Set<String> uniqueKeys = new HashSet<>();
             LocalDate today = LocalDate.now();
             DayOfWeek dayOfWeek = today.getDayOfWeek();
             String dayKorean = dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN);
@@ -222,6 +230,14 @@ public class WelstoryMenuService {
                 }
                 
                 String courseName = String.format("%s (%s)", name, timeLabel);
+                
+                // 중복 식단 방지 필터링
+                String uniqueKey = courseName + "||" + menuDetails;
+                if (uniqueKeys.contains(uniqueKey)) {
+                    continue;
+                }
+                uniqueKeys.add(uniqueKey);
+                
                 String imageUrl = item.has("imageUrl") ? item.get("imageUrl").asText() : "";
                 if (imageUrl.startsWith("http://samsungwelstory.com")) {
                     imageUrl = imageUrl.replace("http://", "https://");
