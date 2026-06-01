@@ -249,9 +249,7 @@ public class WelstoryMenuService {
                     imageUrl = imageUrl.replace("http://", "https://");
                 }
                 
-                String price = "7,500원";
-                if (calories > 800) price = "8,000원";
-                if (calories > 1000) price = "8,500원";
+                String price = "7,840원";
                 
                 courses.add(CourseMenu.builder()
                     .courseName(courseName)
@@ -294,21 +292,21 @@ public class WelstoryMenuService {
                     .courseName("A코스 (한식소담)")
                     .menuDetails("직화 바싹 제육볶음 & 우렁강된장 쌈밥, 흑미밥, 콩나물국, 계란말이, 석박지")
                     .calories(780)
-                    .price("7,500원")
+                    .price("7,840원")
                     .imageUrl("https://images.unsplash.com/photo-1544025162-d76694265947?w=300")
                     .build());
                 courses.add(CourseMenu.builder()
                     .courseName("B코스 (Chef's Table)")
                     .menuDetails("눈꽃치즈 수제 등심 돈카츠, 크림 스프, 오리엔탈 파스타 샐러드, 모닝빵, 피클")
                     .calories(890)
-                    .price("8,000원")
+                    .price("7,840원")
                     .imageUrl("https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=300")
                     .build());
                 courses.add(CourseMenu.builder()
                     .courseName("C코스 (헬스밀)")
                     .menuDetails("아보카도 훈제오리 샐러드 보울, 단호박 죽, 무설탕 요거트, 견과류")
                     .calories(450)
-                    .price("7,500원")
+                    .price("7,840원")
                     .imageUrl("https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=300")
                     .build());
                 break;
@@ -318,98 +316,98 @@ public class WelstoryMenuService {
                     .courseName("A코스 (한식소담)")
                     .menuDetails("춘천식 매콤 닭갈비 덮밥, 팽이버섯 장국, 반반 만두튀김, 무쌈, 배추김치")
                     .calories(740)
-                    .price("7,500원")
+                    .price("7,840원")
                     .imageUrl("https://images.unsplash.com/photo-1627308595229-7830a5c91f9f?w=300")
                     .build());
                 courses.add(CourseMenu.builder()
                     .courseName("B코스 (누들가)")
                     .menuDetails("소고기 쌀국수 & 매콤 해물 볶음밥, 스프링롤 튀김, 단무지, 고수믹스")
                     .calories(810)
-                    .price("8,000원")
+                    .price("7,840원")
                     .imageUrl("https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=300")
                     .build());
                 courses.add(CourseMenu.builder()
                     .courseName("C코스 (Take-out)")
                     .menuDetails("수제 불고기 파니니 샌드위치, 팩 두유, 과일 컵, 감자칩")
                     .calories(520)
-                    .price("7,000원")
+                    .price("7,840원")
                     .imageUrl("https://images.unsplash.com/photo-1521390188846-e2a3a97453a0?w=300")
                     .build());
                 break;
-
+ 
             case WEDNESDAY:
                 // 특식 데이 (수요일)
                 courses.add(CourseMenu.builder()
                     .courseName("A코스 (한식소담 ★특식)")
                     .menuDetails("한방 맑은 소갈비탕, 가마솥 쌀밥, 통오징어 숙회 야채초무침, 오이소박이, 깍두기")
                     .calories(850)
-                    .price("8,500원")
+                    .price("7,840원")
                     .imageUrl("https://images.unsplash.com/photo-1547928576-a4a3323dce9a?w=300")
                     .build());
                 courses.add(CourseMenu.builder()
                     .courseName("B코스 (Chef's Table)")
                     .menuDetails("트러플 크림 버섯 리조또, 수제 떡갈비 스테이크, 카프레제 샐러드, 수제 에이드")
                     .calories(910)
-                    .price("8,500원")
+                    .price("7,840원")
                     .imageUrl("https://images.unsplash.com/photo-1533479093185-190f84097f44?w=300")
                     .build());
                 courses.add(CourseMenu.builder()
                     .courseName("C코스 (헬스밀)")
                     .menuDetails("리코타 치즈 청포도 샐러드, 구운 알감자, 단백질 초코 쉐이크, 사과")
                     .calories(480)
-                    .price("7,500원")
+                    .price("7,840원")
                     .imageUrl("https://images.unsplash.com/photo-1540420773420-3366772f4999?w=300")
                     .build());
                 break;
-
+ 
             case THURSDAY:
                 courses.add(CourseMenu.builder()
                     .courseName("A코스 (한식소담)")
                     .menuDetails("시골 양푼 비빔밥 & 강된장찌개, 바싹 해물파전, 도토리묵 무침, 열무김치")
                     .calories(760)
-                    .price("7,500원")
+                    .price("7,840원")
                     .imageUrl("https://images.unsplash.com/photo-1569058242253-92a9c755a0ec?w=300")
                     .build());
                 courses.add(CourseMenu.builder()
                     .courseName("B코스 (Chef's Table)")
                     .menuDetails("매콤 인도식 탄두리 치킨 카레 & 갈릭 난, 고구마 크로켓, 콘샐러드, 할라피뇨")
                     .calories(830)
-                    .price("8,000원")
+                    .price("7,840원")
                     .imageUrl("https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=300")
                     .build());
                 courses.add(CourseMenu.builder()
                     .courseName("C코스 (Take-out)")
                     .menuDetails("수제 그릴드 닭가슴살 샐러드 랩, 유기농 착즙 오렌지 주스, 하루 견과")
                     .calories(420)
-                    .price("7,000원")
+                    .price("7,840원")
                     .imageUrl("https://images.unsplash.com/photo-1509722747041-616f39b57569?w=300")
                     .build());
                 break;
-
+ 
             case FRIDAY:
                 courses.add(CourseMenu.builder()
                     .courseName("A코스 (한식소담)")
                     .menuDetails("묵은지 김치찌개 & 통통 돼지 등갈비찜, 기장밥, 야채튀김, 구이김, 열무김치")
                     .calories(810)
-                    .price("7,800원")
+                    .price("7,840원")
                     .imageUrl("https://images.unsplash.com/photo-1627308595229-7830a5c91f9f?w=300")
                     .build());
                 courses.add(CourseMenu.builder()
                     .courseName("B코스 (누들가)")
                     .menuDetails("얼큰 차돌 짬뽕 & 바삭 미니 탕수육, 짜사이 무침, 단무지, 군만두")
                     .calories(920)
-                    .price("8,000원")
+                    .price("7,840원")
                     .imageUrl("https://images.unsplash.com/photo-1585032226651-759b368d7246?w=300")
                     .build());
                 courses.add(CourseMenu.builder()
                     .courseName("C코스 (헬스밀)")
                     .menuDetails("닭가슴살 고구마 두부 샐러드, 곤약 젤리, 콜드브루 커피, 토마토")
                     .calories(390)
-                    .price("7,500원")
+                    .price("7,840원")
                     .imageUrl("https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300")
                     .build());
                 break;
-
+ 
             default: // 주말 및 공휴일용 지점별 특선 힐링 메뉴 (사용자 오해 방지용 테마 연동)
                 String localSpecial = "소고기 버섯 전골";
                 String localSpecialDetails = "소고기 버섯 전골 & 즉석 야채 전, 잡곡밥, 오징어 젓갈, 배추김치";
@@ -417,7 +415,7 @@ public class WelstoryMenuService {
                 String localNoodleDetails = "베이컨 까르보나라 파스타, 고르곤졸라 피자(1인용), 그린 그린 그린샐러드, 피클";
                 String localImageA = "https://images.unsplash.com/photo-1544025162-d76694265947?w=300";
                 String localImageB = "https://images.unsplash.com/photo-1546549032-9571cd6b27df?w=300";
-
+ 
                 if (cafeteriaName != null) {
                     if (cafeteriaName.contains("수원")) {
                         localSpecial = "수원 왕갈비탕";
@@ -451,24 +449,24 @@ public class WelstoryMenuService {
                         localImageA = "https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=300";
                     }
                 }
-
+ 
                 courses.add(CourseMenu.builder()
                     .courseName("A코스 (" + localSpecial + ")")
                     .menuDetails(localSpecialDetails)
                     .calories(790)
-                    .price("8,000원")
+                    .price("7,840원")
                     .imageUrl(localImageA)
                     .build());
                 courses.add(CourseMenu.builder()
                     .courseName("B코스 (" + localNoodle + ")")
                     .menuDetails(localNoodleDetails)
                     .calories(870)
-                    .price("8,500원")
+                    .price("7,840원")
                     .imageUrl(localImageB)
                     .build());
                 break;
         }
-
+ 
         return WelstoryMenuResult.builder()
             .cafeteriaName(cafeteriaName != null ? cafeteriaName : "사내식당")
             .dateStr(dateHeader)
@@ -538,15 +536,7 @@ public class WelstoryMenuService {
                     calories = kcalNode.asInt();
                 }
                 
-                String price = "7,500원"; // 기본값
-                JsonNode priceNode = getJsonNode(item, "price", "priceVal", "menuPrice", "amt");
-                if (priceNode != null && !priceNode.isNull()) {
-                    if (priceNode.isNumber()) {
-                        price = String.format("%,d원", priceNode.asInt());
-                    } else {
-                        price = priceNode.asText();
-                    }
-                }
+                String price = "7,840원";
                 
                 String imageUrl = getJsonField(item, "imageUrl", "imgUrl", "imagePath", "photoPath", "photoUrl");
                 
