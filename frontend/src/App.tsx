@@ -163,6 +163,67 @@ function App() {
   const [submittedReviewCourses, setSubmittedReviewCourses] = useState<Record<string, boolean>>({});
   const [isReviewInputFocused, setIsReviewInputFocused] = useState(false);
 
+  // 📱 PWA 설치 관련 상태 변수 및 로직
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+
+  useEffect(() => {
+    // 1. 이미 앱 형태로 설치되어 실행 중인지 확인
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
+      || (window.navigator as any).standalone 
+      || document.referrer.includes('android-app://');
+    
+    if (isStandalone) {
+      return;
+    }
+
+    // 2. iOS 기기 여부 판별
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    const ios = /iphone|ipad|ipod/.test(userAgent);
+    setIsIOS(ios);
+
+    // 3. 안드로이드 / 크롬 브라우저의 설치 프롬프트 대기
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBanner(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // 4. iOS의 경우 2초 뒤 가이드 노출 (하루 1회만 제안하여 도배성 UX 방지)
+    if (ios) {
+      const timer = setTimeout(() => {
+        const dismissed = localStorage.getItem('pwa_dismissed_date');
+        const today = new Date().toISOString().split('T')[0];
+        if (dismissed !== today) {
+          setShowInstallBanner(true);
+        }
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`User response to the install prompt: ${outcome}`);
+    setDeferredPrompt(null);
+    setShowInstallBanner(false);
+  };
+
+  const handleDismissInstall = () => {
+    setShowInstallBanner(false);
+    const today = new Date().toISOString().split('T')[0];
+    localStorage.setItem('pwa_dismissed_date', today);
+  };
+
   // 🎮 커피빵 내기 미니게임 관련 상태 변수
   const [isCoffeeGameOpen, setIsCoffeeGameOpen] = useState(false);
   const [playerCount, setPlayerCount] = useState(4);
@@ -2620,10 +2681,7 @@ function App() {
                 })()}
 
             {/* 6. 모달 하단 퀵 액션 */}
-            <div className="bg-zinc-50/80 border-t border-zinc-200 p-4 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-bold text-zinc-500 sm:px-6">
-              <span className="leading-relaxed">
-                📢 <span className="text-orange-600">주말/공휴일에는 구내식당이 휴무</span>이므로, 지점 변경 테스트를 원활히 돕기 위해 각 지점별 시그니처 힐링 모의 식단(수원 갈비탕, 서초 규동 등)이 동적으로 로드됩니다! 평일에는 실제 라이브 데이터가 실시간으로 수집됩니다.
-              </span>
+            <div className="bg-zinc-50/80 border-t border-zinc-200 p-4 shrink-0 flex flex-col sm:flex-row sm:items-center justify-end gap-4 text-xs font-bold text-zinc-500 sm:px-6">
               <button 
                 onClick={() => {
                   setIsMenuDetailOpen(false);
@@ -2888,6 +2946,51 @@ function App() {
       <footer className="w-full text-center py-5 text-xs text-zinc-400 border-t border-zinc-100">
         © 2026 아무거나 버스터 (Amugeona Buster)
       </footer>
+
+      {/* PWA Install Banner */}
+      {showInstallBanner && (
+        <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 bg-white/95 backdrop-blur-md border border-zinc-200 p-4 rounded-2xl shadow-2xl z-[9999] flex flex-col gap-3 transition-all duration-300">
+          <div className="flex items-start justify-between">
+            <div className="flex gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-orange-500 flex items-center justify-center text-white text-lg font-black shadow-md shrink-0">
+                🍱
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-zinc-900">아무거나 버스터 앱 설치</h4>
+                <p className="text-[11px] text-zinc-500 mt-0.5">바탕화면에 추가하여 1초 만에 식단을 확인하세요!</p>
+              </div>
+            </div>
+            <button 
+              onClick={handleDismissInstall}
+              className="text-zinc-400 hover:text-zinc-600 p-1 cursor-pointer transition-colors text-sm"
+            >
+              ✕
+            </button>
+          </div>
+
+          {isIOS ? (
+            <div className="bg-zinc-50 border border-zinc-100 rounded-xl p-3 text-[11px] text-zinc-600 leading-relaxed font-medium">
+              💡 <span className="font-bold text-rose-500">아이폰(Safari) 설치 방법:</span><br />
+              하단 공유 버튼 <span className="font-bold text-zinc-800">📤(공유)</span>을 누르고 아래로 스크롤하여 <span className="font-bold text-zinc-800">‘홈 화면에 추가’</span>를 클릭하세요.
+            </div>
+          ) : (
+            <div className="flex gap-2 justify-end mt-1">
+              <button 
+                onClick={handleDismissInstall}
+                className="px-3 py-1.5 text-xs font-bold text-zinc-500 hover:bg-zinc-100 rounded-lg cursor-pointer transition-colors"
+              >
+                나중에
+              </button>
+              <button 
+                onClick={handleInstallClick}
+                className="px-4 py-1.5 text-xs font-black text-white bg-rose-500 hover:bg-rose-600 rounded-lg cursor-pointer transition-colors shadow-xs shadow-rose-200"
+              >
+                앱 설치하기
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -6,6 +6,9 @@ import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.http.*;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -19,6 +22,9 @@ import java.util.*;
 public class WelstoryMenuService {
 
     private final RestTemplate restTemplate = new RestTemplate();
+    private static String cachedToken = null;
+    private static long tokenExpiryTime = 0;
+    private static final String DEVICE_ID = UUID.randomUUID().toString();
 
     @Getter
     @Builder
@@ -33,11 +39,215 @@ public class WelstoryMenuService {
     @Builder
     @ToString
     public static class CourseMenu {
-        private final String courseName; // e.g., "A코스 (KOREAN)", "B코스 (INTERNATION)"
-        private final String menuDetails; // e.g., "마늘보쌈 & 비빔국수, 겉절이, 쌈무, 매실차"
-        private final int calories; // e.g., 780
-        private final String price; // e.g., "7,500원"
+        private final String courseName;
+        private final String menuDetails;
+        private final int calories;
+        private final String price;
         private final String imageUrl;
+    }
+
+    private synchronized String getOrFetchToken() {
+        if (cachedToken != null && System.currentTimeMillis() < tokenExpiryTime) {
+            return cachedToken;
+        }
+
+        String username = System.getenv("WELSTORY_USERNAME");
+        String password = System.getenv("WELSTORY_PASSWORD");
+        
+        if (username == null || username.isEmpty() || password == null || password.isEmpty()) {
+            username = System.getProperty("WELSTORY_USERNAME");
+            password = System.getProperty("WELSTORY_PASSWORD");
+        }
+
+        if (username == null || username.isEmpty() || password == null || password.isEmpty()) {
+            throw new IllegalStateException("Welstory credentials (WELSTORY_USERNAME, WELSTORY_PASSWORD) are not set in environment or system properties.");
+        }
+
+        log.info("Fetching new Welstory Plus JWT token for user: {}", username);
+        try {
+            String url = "https://welplus.welstory.com/login";
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("User-Agent", "Welplus");
+            headers.set("X-Device-Id", DEVICE_ID);
+            headers.set("X-Autologin", "N");
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+            MultiValueMap<String, String> map = new LinkedMultiValueMap<>();
+            map.add("username", username);
+            map.add("password", password);
+            map.add("remember-me", "false");
+
+            HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(map, headers);
+            
+            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+            
+            if (response.getStatusCode().is2xxSuccessful()) {
+                String authHeader = response.getHeaders().getFirst("Authorization");
+                if (authHeader != null && !authHeader.isEmpty()) {
+                    cachedToken = authHeader;
+                    // 토큰은 보통 만료기간이 깁니다. 안전하게 2시간으로 캐시 설정
+                    tokenExpiryTime = System.currentTimeMillis() + (2 * 60 * 60 * 1000);
+                    log.info("Successfully fetched and cached Welstory Plus JWT token.");
+                    return cachedToken;
+                }
+            }
+            log.error("Welstory Plus Login failed. Status: {}", response.getStatusCode());
+        } catch (Exception e) {
+            log.error("Error logging in to Welstory Plus: {}", e.getMessage(), e);
+        }
+        return null;
+    }
+
+    private String getValidToken(boolean forceRefresh) {
+        if (forceRefresh) {
+            cachedToken = null;
+        }
+        return getOrFetchToken();
+    }
+
+    private String getRestaurantCode(String cafeteriaName) {
+        if (cafeteriaName == null || cafeteriaName.isEmpty()) {
+            return "REST000039"; // Default DSR
+        }
+        if (cafeteriaName.contains("DSR")) {
+            return "REST000039";
+        } else if (cafeteriaName.contains("수원") || cafeteriaName.contains("R5")) {
+            return "REST000007"; // R5 B1F 기준 기본값
+        } else if (cafeteriaName.contains("기흥")) {
+            return "REST000039"; // 기존 연동과 동일하게 DSR로 매핑
+        } else if (cafeteriaName.contains("화성") || cafeteriaName.contains("H1")) {
+            return "REST000032"; // H1 Cafeteria
+        } else if (cafeteriaName.contains("서초")) {
+            return "REST000001"; // 생명서초
+        } else if (cafeteriaName.contains("본사") || cafeteriaName.contains("HQ")) {
+            return "REST000050"; // 웰스토리 본사 (헬씨랩)
+        }
+        return "REST000039";
+    }
+
+    private List<CourseMenu> fetchMenusForMealType(String restaurantCode, String dateStr, String mealTimeId, String token) {
+        try {
+            String url = String.format("https://welplus.welstory.com/api/meal?menuDt=%s&menuMealType=%s&restaurantCode=%s", 
+                                       dateStr, mealTimeId, restaurantCode);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("User-Agent", "Welplus");
+            headers.set("X-Device-Id", DEVICE_ID);
+            headers.set("Authorization", token);
+            
+            HttpEntity<Void> request = new HttpEntity<>(headers);
+            
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
+            
+            if (response.getStatusCode().value() == 401 || response.getStatusCode().value() == 403) {
+                log.warn("Token expired (Status: {}). Retrying with forced login.", response.getStatusCode());
+                String newToken = getValidToken(true);
+                if (newToken != null) {
+                    headers.set("Authorization", newToken);
+                    request = new HttpEntity<>(headers);
+                    response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
+                }
+            }
+
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                log.error("Failed to fetch menu from Welplus API. Status: {}", response.getStatusCode());
+                return null;
+            }
+
+            String body = response.getBody();
+            if (body == null || body.trim().isEmpty()) {
+                return null;
+            }
+
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode rootNode = mapper.readTree(body);
+            
+            if (!rootNode.has("data") || rootNode.get("data").isNull()) {
+                return null;
+            }
+            
+            JsonNode dataNode = rootNode.get("data");
+            if (!dataNode.has("mealList") || !dataNode.get("mealList").isArray()) {
+                return null;
+            }
+            
+            JsonNode mealList = dataNode.get("mealList");
+            List<CourseMenu> menus = new ArrayList<>();
+            Set<String> uniqueKeys = new HashSet<>();
+            
+            for (JsonNode item : mealList) {
+                String courseTxt = item.has("courseTxt") ? item.get("courseTxt").asText().trim() : "";
+                String menuName = item.has("menuName") ? item.get("menuName").asText().trim() : "";
+                String subMenuTxt = item.has("subMenuTxt") ? item.get("subMenuTxt").asText().trim() : "";
+                String menuNameEng = (item.has("menuNameEng") && !item.get("menuNameEng").isNull()) ? item.get("menuNameEng").asText().trim() : "";
+                
+                if (menuName.isEmpty() || menuName.contains("주말메뉴안내") || menuName.contains("테이크아웃")) {
+                    continue;
+                }
+                
+                String timeLabel = "점심";
+                if ("1".equals(mealTimeId)) timeLabel = "아침";
+                else if ("3".equals(mealTimeId)) timeLabel = "저녁";
+                else if ("4".equals(mealTimeId)) timeLabel = "야식";
+                
+                String courseName = courseTxt;
+                if (courseName.isEmpty()) {
+                    courseName = "오늘의 코스";
+                }
+                
+                if (!menuNameEng.isEmpty()) {
+                    courseName = String.format("%s (%s) [%s]", courseName, timeLabel, menuNameEng);
+                } else {
+                    courseName = String.format("%s (%s)", courseName, timeLabel);
+                }
+                
+                String menuDetails = subMenuTxt;
+                if (menuDetails.isEmpty()) {
+                    menuDetails = menuName;
+                }
+                
+                // 중복 식단 방지 필터링
+                String uniqueKey = courseName + "||" + menuDetails;
+                if (uniqueKeys.contains(uniqueKey)) {
+                    continue;
+                }
+                uniqueKeys.add(uniqueKey);
+                
+                int calories = 0;
+                if (item.has("kcal")) {
+                    try {
+                        calories = Integer.parseInt(item.get("kcal").asText().replaceAll("[^0-9]", ""));
+                    } catch (Exception e) {}
+                }
+                
+                String photoCd = item.has("photoCd") ? item.get("photoCd").asText().trim() : "";
+                String photoUrl = item.has("photoUrl") ? item.get("photoUrl").asText().trim() : "";
+                String imageUrl = "";
+                if (!photoCd.isEmpty() && !photoUrl.isEmpty()) {
+                    imageUrl = photoUrl + photoCd;
+                    if (imageUrl.startsWith("http://samsungwelstory.com")) {
+                        imageUrl = imageUrl.replace("http://", "https://");
+                    }
+                }
+                
+                String price = "7,840원";
+                
+                menus.add(CourseMenu.builder()
+                        .courseName(courseName)
+                        .menuDetails(menuDetails)
+                        .calories(calories)
+                        .price(price)
+                        .imageUrl(imageUrl)
+                        .build());
+            }
+            
+            return menus;
+            
+        } catch (Exception e) {
+            log.error("Failed to fetch/parse menu for meal type {}: {}", mealTimeId, e.getMessage(), e);
+        }
+        return null;
     }
 
     /**
@@ -45,87 +255,44 @@ public class WelstoryMenuService {
      */
     public WelstoryMenuResult getTodayMenu(String cotNo, String hallNo, String cafeteriaName) {
         LocalDate today = LocalDate.now();
-        String dateStr = today.toString();
+        String dayKorean = today.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.KOREAN);
+        String dateHeader = String.format("%d월 %d일 (%s)", today.getMonthValue(), today.getDayOfMonth(), dayKorean);
         String yyyyMMdd = today.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
         
-        log.info("Attempting to fetch Welstory menu using Welplan bridge for cafeteria: {}, cotNo: {}, hallNo: {}", cafeteriaName, cotNo, hallNo);
+        log.info("Attempting to fetch Welstory menu using direct Welplus API for cafeteria: {}", cafeteriaName);
         
         try {
-            // 1. 식당 검색을 통해 Welplan 식당 ID 획득
-            String searchName = cafeteriaName;
-            if (searchName == null || searchName.isEmpty()) {
-                searchName = "DSR";
+            String token = getValidToken(false);
+            if (token == null) {
+                log.warn("Could not obtain valid Welstory token. Utilizing premium fallback menu.");
+                return generatePremiumFallbackMenu(today, cafeteriaName);
             }
-            if (searchName.contains("DSR")) searchName = "DSR";
-            else if (searchName.contains("수원")) searchName = "R5";
-            else if (searchName.contains("기흥")) searchName = "DSR";
-            else if (searchName.contains("화성")) searchName = "H1";
-            else if (searchName.contains("서초")) searchName = "서초";
-            
-            String searchUrl = "https://welplan.pmh.codes/proxy/search?q=" + java.net.URLEncoder.encode(searchName, "UTF-8");
-            log.info("Querying Welplan search: {}", searchUrl);
-            
-            byte[] searchBytes = restTemplate.getForObject(searchUrl, byte[].class);
-            String searchRes = searchBytes != null ? new String(searchBytes, java.nio.charset.StandardCharsets.UTF_8) : null;
-            String restaurantId = null;
-            
-            if (searchRes != null && !searchRes.isEmpty()) {
-                ObjectMapper mapper = new ObjectMapper();
-                JsonNode rootNode = mapper.readTree(searchRes);
-                JsonNode arrayNode = null;
-                if (rootNode.isArray()) {
-                    arrayNode = rootNode;
-                } else if (rootNode.has("value") && rootNode.get("value").isArray()) {
-                    arrayNode = rootNode.get("value");
-                }
-                
-                if (arrayNode != null && arrayNode.size() > 0) {
-                    restaurantId = arrayNode.get(0).get("id").asText();
-                    log.info("Found Welplan restaurant mapping. ID: {}, Name: {}", restaurantId, arrayNode.get(0).get("name").asText());
+
+            String restaurantCode = getRestaurantCode(cafeteriaName);
+            List<CourseMenu> courses = new ArrayList<>();
+
+            // 1(아침), 2(점심), 3(저녁), 4(야식) 식단을 순회하며 수집
+            for (int mealType = 1; mealType <= 4; mealType++) {
+                List<CourseMenu> mealTypeMenus = fetchMenusForMealType(restaurantCode, yyyyMMdd, String.valueOf(mealType), token);
+                if (mealTypeMenus != null) {
+                    courses.addAll(mealTypeMenus);
                 }
             }
-            
-            if (restaurantId == null) {
-                restaurantId = "REST000039"; // DSR 기본값
+
+            if (!courses.isEmpty()) {
+                log.info("Successfully loaded {} real-time menus from direct Welplus API!", courses.size());
+                return WelstoryMenuResult.builder()
+                        .cafeteriaName(cafeteriaName != null ? cafeteriaName : "사내식당")
+                        .dateStr(dateHeader)
+                        .courses(courses)
+                        .build();
             }
             
-            // 2. 쿠키를 실어서 takein 식단 조회 (302 리다이렉션을 피하기 위해 직접 /all 로 요청)
-            String targetUrl = "https://welplan.pmh.codes/takein/" + yyyyMMdd + "/all";
-            log.info("Requesting Welplan takein page: {}", targetUrl);
-            
-            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-            headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
-            
-            String cookieJson = String.format("[{\"id\":\"%s\",\"name\":\"%s\",\"vendor\":\"welstory\"}]", restaurantId, searchName);
-            String encodedCookie = java.net.URLEncoder.encode(cookieJson, "UTF-8");
-            headers.set("Cookie", "welplan_restaurants=" + encodedCookie);
-            
-            org.springframework.http.HttpEntity<String> entity = new org.springframework.http.HttpEntity<>(headers);
-            org.springframework.http.ResponseEntity<byte[]> response = restTemplate.exchange(targetUrl, org.springframework.http.HttpMethod.GET, entity, byte[].class);
-            byte[] bodyBytes = response.getBody();
-            String html = bodyBytes != null ? new String(bodyBytes, java.nio.charset.StandardCharsets.UTF_8) : "";
-            
-            if (html != null && !html.isEmpty()) {
-                // 3. menus 배열 추출
-                java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("menus:\\s*(\\[[\\s\\S]*?\\])\\s*,\\s*(date|time):");
-                java.util.regex.Matcher matcher = pattern.matcher(html);
-                if (matcher.find()) {
-                    String menusJson = matcher.group(1);
-                    log.info("Extracted menus JSON payload of length: {}", menusJson.length());
-                    
-                    WelstoryMenuResult parsed = parseWelplanMenus(menusJson, cafeteriaName, yyyyMMdd);
-                    if (parsed != null && !parsed.getCourses().isEmpty()) {
-                        log.info("Successfully loaded {} real-time DSR menus from Welplan bridge!", parsed.getCourses().size());
-                        return parsed;
-                    }
-                }
-            }
-            
-            log.warn("Failed to scrape Welplan menus. Utilizing premium fallback menu.");
+            log.warn("No menus returned from Welplus API. Utilizing premium fallback menu.");
             return generatePremiumFallbackMenu(today, cafeteriaName);
             
         } catch (Exception e) {
-            log.warn("Failed to fetch menu from Welplan bridge ({}). Utilizing premium fallback menu.", e.getMessage(), e);
+            log.warn("Failed to fetch menu from direct Welplus API ({}). Utilizing premium fallback menu.", e.getMessage(), e);
             return generatePremiumFallbackMenu(today, cafeteriaName);
         }
     }
