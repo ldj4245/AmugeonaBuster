@@ -1,42 +1,49 @@
 package com.amugeonabuster.adapter.in.web;
 
+import com.amugeonabuster.application.port.in.GetTodayMenuQuery;
+import com.amugeonabuster.application.port.in.GetWelstoryAlertQuery;
+import com.amugeonabuster.application.port.in.KakaoAuthCommand;
+import com.amugeonabuster.application.port.in.SaveWelstoryAlertCommand;
+import com.amugeonabuster.application.port.out.KakaoApiPort.KakaoOAuthResponse;
+import com.amugeonabuster.application.port.out.KakaoApiPort.KakaoUserMeResponse;
 import com.amugeonabuster.domain.model.WelstoryAlertSettings;
-import com.amugeonabuster.application.port.in.WelstoryAlertUseCase;
-import com.amugeonabuster.application.service.KakaoMessageService;
-import com.amugeonabuster.application.service.WelstoryMenuService;
+import com.amugeonabuster.domain.model.WelstoryMenuResult;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Data;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.*;
-
-import org.springframework.beans.factory.annotation.Value;
-
-import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/welstory")
 @Slf4j
 public class WelstoryAlertController {
 
-    private final WelstoryAlertUseCase welstoryAlertUseCase;
-    private final WelstoryMenuService menuService;
-    private final KakaoMessageService kakaoMessageService;
+    private final GetWelstoryAlertQuery getWelstoryAlertQuery;
+    private final SaveWelstoryAlertCommand saveWelstoryAlertCommand;
+    private final GetTodayMenuQuery menuQuery;
+    private final KakaoAuthCommand kakaoAuthCommand;
     private final String restKey;
 
     public WelstoryAlertController(
-            WelstoryAlertUseCase welstoryAlertUseCase,
-            WelstoryMenuService menuService,
-            KakaoMessageService kakaoMessageService,
+            GetWelstoryAlertQuery getWelstoryAlertQuery,
+            SaveWelstoryAlertCommand saveWelstoryAlertCommand,
+            GetTodayMenuQuery menuQuery,
+            KakaoAuthCommand kakaoAuthCommand,
             @Value("${kakao.api.rest-key}") String restKey
     ) {
-        this.welstoryAlertUseCase = welstoryAlertUseCase;
-        this.menuService = menuService;
-        this.kakaoMessageService = kakaoMessageService;
+        this.getWelstoryAlertQuery = getWelstoryAlertQuery;
+        this.saveWelstoryAlertCommand = saveWelstoryAlertCommand;
+        this.menuQuery = menuQuery;
+        this.kakaoAuthCommand = kakaoAuthCommand;
         this.restKey = restKey;
     }
 
@@ -49,8 +56,8 @@ public class WelstoryAlertController {
         private String cotNo;
         private String hallNo;
         private String cafeteriaName;
-        private String scheduledDays; // e.g., "1,2,3,4,5"
-        private String scheduledTime; // e.g., "11:30"
+        private String scheduledDays;
+        private String scheduledTime;
         
         @JsonProperty("isEnabled")
         private boolean isEnabled;
@@ -70,9 +77,6 @@ public class WelstoryAlertController {
         private String hallNo;
     }
 
-    /**
-     * 카카오 OAuth 인증 URL을 발급합니다.
-     */
     @GetMapping("/auth-url")
     public ResponseEntity<Map<String, String>> getAuthUrl(@RequestParam("redirectUri") String redirectUri) {
         log.info("Generating Kakao OAuth Auth URL. RedirectUri: {}", redirectUri);
@@ -80,26 +84,23 @@ public class WelstoryAlertController {
             + "?client_id=" + restKey
             + "&redirect_uri=" + redirectUri
             + "&response_type=code"
-            + "&scope=talk_message"; // talk_message는 필수
+            + "&scope=talk_message";
         Map<String, String> response = new HashMap<>();
         response.put("url", url);
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * 카카오 OAuth 인증 코드를 토큰으로 교환하고 기본 알림 설정을 저장/로드합니다.
-     */
     @PostMapping("/token-exchange")
     public ResponseEntity<WelstoryAlertSettings> tokenExchange(@RequestBody TokenExchangeRequest request) {
         log.info("Performing Kakao token exchange for code: {}", request.getCode());
         try {
-            KakaoMessageService.KakaoOAuthResponse tokens = kakaoMessageService.getOAuthTokens(request.getCode(), request.getRedirectUri());
-            KakaoMessageService.KakaoUserMeResponse profile = kakaoMessageService.getUserMe(tokens.getAccessToken());
+            KakaoOAuthResponse tokens = kakaoAuthCommand.getOAuthTokens(request.getCode(), request.getRedirectUri());
+            KakaoUserMeResponse profile = kakaoAuthCommand.getUserMe(tokens.getAccessToken());
 
             String kakaoId = String.valueOf(profile.getId());
-            String nickname = profile.getProperties() != null ? profile.getProperties().getNickname() : "사용자";
+            String nickname = profile.getNickname();
 
-            WelstoryAlertSettings entity = welstoryAlertUseCase.getSettings(kakaoId)
+            WelstoryAlertSettings entity = getWelstoryAlertQuery.getSettings(kakaoId)
                 .orElseGet(() -> WelstoryAlertSettings.builder()
                     .kakaoId(kakaoId)
                     .cotNo("WEL_DSR")
@@ -114,7 +115,7 @@ public class WelstoryAlertController {
             entity.setKakaoAccessToken(tokens.getAccessToken());
             entity.setKakaoRefreshToken(tokens.getRefreshToken());
 
-            WelstoryAlertSettings saved = welstoryAlertUseCase.saveSettings(entity);
+            WelstoryAlertSettings saved = saveWelstoryAlertCommand.saveSettings(entity);
             return ResponseEntity.ok(saved);
         } catch (Exception e) {
             log.error("Failed to perform token exchange: {}", e.getMessage(), e);
@@ -122,28 +123,21 @@ public class WelstoryAlertController {
         }
     }
 
-    /**
-     * 특정 카카오 유저의 웰스토리 알림 설정을 가져옵니다.
-     */
     @GetMapping("/settings")
     public ResponseEntity<WelstoryAlertSettings> getSettings(@RequestParam("kakaoId") String kakaoId) {
-        log.info("Fetching Welstory settings for kakaoId: {}", kakaoId);
-        return welstoryAlertUseCase.getSettings(kakaoId)
+        log.info("Viewing Welstory settings for kakaoId: {}", kakaoId);
+        return getWelstoryAlertQuery.getSettings(kakaoId)
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
 
-    /**
-     * 웰스토리 알림 설정을 저장하거나 업데이트합니다.
-     */
     @PostMapping("/settings")
     public ResponseEntity<WelstoryAlertSettings> saveSettings(@RequestBody SaveSettingsRequest request) {
         log.info("Saving Welstory settings for user: {}, kakaoId: {}", request.getNickname(), request.getKakaoId());
 
-        WelstoryAlertSettings entity = welstoryAlertUseCase.getSettings(request.getKakaoId())
+        WelstoryAlertSettings entity = getWelstoryAlertQuery.getSettings(request.getKakaoId())
             .orElseGet(() -> WelstoryAlertSettings.builder().kakaoId(request.getKakaoId()).build());
 
-        // 값 업데이트
         entity.setNickname(request.getNickname());
         entity.setKakaoAccessToken(request.getKakaoAccessToken());
         entity.setKakaoRefreshToken(request.getKakaoRefreshToken());
@@ -154,20 +148,17 @@ public class WelstoryAlertController {
         entity.setScheduledTime(request.getScheduledTime());
         entity.setEnabled(request.isEnabled());
 
-        WelstoryAlertSettings saved = welstoryAlertUseCase.saveSettings(entity);
+        WelstoryAlertSettings saved = saveWelstoryAlertCommand.saveSettings(entity);
         return ResponseEntity.ok(saved);
     }
 
-    /**
-     * 설정 테스트를 위해 오늘 구내식당 식단을 사용자 카카오톡으로 지금 즉시 발송합니다.
-     */
     @PostMapping("/test-send")
     public ResponseEntity<Map<String, Object>> testSend(@RequestParam("kakaoId") String kakaoId) {
         log.info("Triggering immediate test Welstory send for kakaoId: {}", kakaoId);
         Map<String, Object> response = new HashMap<>();
 
         try {
-            boolean success = welstoryAlertUseCase.triggerTestSend(kakaoId);
+            boolean success = saveWelstoryAlertCommand.triggerTestSend(kakaoId);
             if (success) {
                 response.put("success", true);
                 response.put("message", "성공적으로 테스트 메시지가 카카오톡으로 발송되었습니다! 카톡을 확인해 보세요. 🍱");
@@ -189,9 +180,6 @@ public class WelstoryAlertController {
         }
     }
 
-    /**
-     * 편리한 구내식당 코드 입력을 위한 사전 정의된 주요 삼성 웰스토리 지점 코드 목록을 조회합니다.
-     */
     @GetMapping("/cafeterias")
     public ResponseEntity<List<CafeteriaPreset>> getCafeterias() {
         List<CafeteriaPreset> presets = new ArrayList<>();
@@ -204,20 +192,17 @@ public class WelstoryAlertController {
         return ResponseEntity.ok(presets);
     }
 
-    /**
-     * 오늘의 구내식당 식단 발송 완료 플래그를 강제로 초기화합니다 (테스트 지원용).
-     */
     @PostMapping("/reset-last-sent")
     public ResponseEntity<Map<String, Object>> resetLastSent(@RequestParam(value = "kakaoId", required = false) String kakaoId) {
         Map<String, Object> response = new HashMap<>();
         try {
             if (kakaoId == null || kakaoId.trim().isEmpty()) {
                 log.info("Resetting lastSentDate for all users.");
-                welstoryAlertUseCase.resetAllLastSentDates();
+                saveWelstoryAlertCommand.resetAllLastSentDates();
                 response.put("message", "전체 사용자의 오늘 자 발송 완료 플래그가 강제 초기화되었습니다! 🔄");
             } else {
                 log.info("Resetting lastSentDate for kakaoId: {}", kakaoId);
-                welstoryAlertUseCase.resetLastSentDate(kakaoId);
+                saveWelstoryAlertCommand.resetLastSentDate(kakaoId);
                 response.put("message", "해당 사용자의 오늘 자 발송 완료 플래그가 강제 초기화되었습니다! 🔄");
             }
             response.put("success", true);
@@ -230,19 +215,15 @@ public class WelstoryAlertController {
         }
     }
 
-    /**
-     * 특정 구내식당 지점의 오늘의 실시간 전체 식단 목록을 조회합니다.
-     * 프론트엔드 프리미엄 상세 메뉴판 뷰어에서 실시간 호출합니다.
-     */
     @GetMapping("/menu-details")
-    public ResponseEntity<WelstoryMenuService.WelstoryMenuResult> getMenuDetails(
+    public ResponseEntity<WelstoryMenuResult> getMenuDetails(
             @RequestParam("cotNo") String cotNo,
             @RequestParam("hallNo") String hallNo,
             @RequestParam("cafeteriaName") String cafeteriaName
     ) {
-        log.info("Fetching real-time Welstory menu details for cotNo: {}, hallNo: {}", cotNo, hallNo);
+        log.info("Viewing real-time Welstory menu details for cotNo: {}, hallNo: {}", cotNo, hallNo);
         try {
-            WelstoryMenuService.WelstoryMenuResult menuResult = menuService.getTodayMenu(cotNo, hallNo, cafeteriaName);
+            WelstoryMenuResult menuResult = menuQuery.getTodayMenu(cotNo, hallNo, cafeteriaName);
             return ResponseEntity.ok(menuResult);
         } catch (Exception e) {
             log.error("Failed to fetch Welstory menu details: {}", e.getMessage(), e);

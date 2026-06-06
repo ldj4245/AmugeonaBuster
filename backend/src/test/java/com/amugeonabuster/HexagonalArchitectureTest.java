@@ -1,12 +1,13 @@
 package com.amugeonabuster;
 
+import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 
 import static com.tngtech.archunit.library.Architectures.onionArchitecture;
 
-@AnalyzeClasses(packages = "com.amugeonabuster")
+@AnalyzeClasses(packages = "com.amugeonabuster", importOptions = ImportOption.DoNotIncludeTests.class)
 public class HexagonalArchitectureTest {
 
     @ArchTest
@@ -19,5 +20,6 @@ public class HexagonalArchitectureTest {
             .adapter("websocket-out", "..adapter.out.websocket..")
             .adapter("persistence", "..adapter.out.persistence..")
             .adapter("external", "..adapter.out.external..")
-            .adapter("mock", "..adapter.out.mock..");
+            .adapter("mock", "..adapter.out.mock..")
+            .adapter("scheduler", "..adapter.in.scheduler..");
 }

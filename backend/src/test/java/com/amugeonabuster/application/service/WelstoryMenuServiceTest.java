@@ -1,5 +1,8 @@
 package com.amugeonabuster.application.service;
 
+import com.amugeonabuster.adapter.out.external.WelplusApiAdapter;
+import com.amugeonabuster.domain.model.WelstoryMenuResult;
+import com.amugeonabuster.domain.model.WelstoryMenuResult.CourseMenu;
 import org.junit.jupiter.api.Test;
 import java.time.LocalDate;
 import static org.junit.jupiter.api.Assertions.*;
@@ -8,7 +11,8 @@ public class WelstoryMenuServiceTest {
 
     @Test
     public void testGetTodayMenu() {
-        WelstoryMenuService service = new WelstoryMenuService();
+        WelplusApiAdapter apiAdapter = new WelplusApiAdapter();
+        WelstoryMenuService service = new WelstoryMenuService(apiAdapter);
         
         // 환경 변수나 시스템 프로퍼티에서 주입받아 테스트 실행 (하드코딩 방지)
         String username = System.getenv("WELSTORY_USERNAME");
@@ -27,7 +31,7 @@ public class WelstoryMenuServiceTest {
         System.setProperty("WELSTORY_PASSWORD", password);
         
         System.out.println("Fetching real-time menu for DSR...");
-        WelstoryMenuService.WelstoryMenuResult result = service.getTodayMenu(null, null, "삼성 DSR 타워 웰스토리");
+        WelstoryMenuResult result = service.getTodayMenu(null, null, "삼성 DSR 타워 웰스토리");
         
         System.out.println("==================================================");
         System.out.println("📢 웰스토리 플러스 API 수집 및 매핑 결과");
@@ -40,7 +44,7 @@ public class WelstoryMenuServiceTest {
         assertEquals("삼성 DSR 타워 웰스토리", result.getCafeteriaName());
         assertFalse(result.getCourses().isEmpty(), "식단 코스 목록이 비어있으면 안 됩니다.");
         
-        for (WelstoryMenuService.CourseMenu course : result.getCourses()) {
+        for (CourseMenu course : result.getCourses()) {
             System.out.println("\n[코스] " + course.getCourseName());
             System.out.println(" - 상세내용: " + course.getMenuDetails());
             System.out.println(" - 칼로리: " + course.getCalories() + " kcal");
