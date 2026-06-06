@@ -215,7 +215,12 @@ public class WelstoryMenuService {
                 uniqueKeys.add(uniqueKey);
                 
                 int calories = 0;
-                if (item.has("kcal")) {
+                if (item.has("sumKcal") && !item.get("sumKcal").isNull() && !item.get("sumKcal").asText().trim().isEmpty()) {
+                    try {
+                        calories = Integer.parseInt(item.get("sumKcal").asText().replaceAll("[^0-9]", ""));
+                    } catch (Exception e) {}
+                }
+                if (calories == 0 && item.has("kcal") && !item.get("kcal").isNull()) {
                     try {
                         calories = Integer.parseInt(item.get("kcal").asText().replaceAll("[^0-9]", ""));
                     } catch (Exception e) {}
@@ -698,9 +703,11 @@ public class WelstoryMenuService {
                 }
                 
                 int calories = 0;
-                JsonNode kcalNode = getJsonNode(item, "calories", "kcal", "totKcal", "kcalVal");
-                if (kcalNode != null && !kcalNode.isNull()) {
-                    calories = kcalNode.asInt();
+                JsonNode kcalNode = getJsonNode(item, "sumKcal", "calories", "kcal", "totKcal", "kcalVal");
+                if (kcalNode != null && !kcalNode.isNull() && !kcalNode.asText().trim().isEmpty()) {
+                    try {
+                        calories = Integer.parseInt(kcalNode.asText().replaceAll("[^0-9]", ""));
+                    } catch (Exception e) {}
                 }
                 
                 String price = "7,840원";
