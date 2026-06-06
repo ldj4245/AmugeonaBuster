@@ -233,6 +233,14 @@ function App() {
   const [looserName, setLooserName] = useState('');
   const [showReceipt, setShowReceipt] = useState(false);
 
+  const [activeGameTab, setActiveGameTab] = useState<'coffee' | 'ladder'>('coffee');
+  const [ladderPlayers, setLadderPlayers] = useState<string[]>([]);
+  const [ladderResults, setLadderResults] = useState<string[]>([]);
+  const [ladderBridges, setLadderBridges] = useState<{ from: number; to: number; y: number }[]>([]);
+  const [animatingPlayerIndex, setAnimatingPlayerIndex] = useState<number | null>(null);
+  const [ladderPath, setLadderPath] = useState<string>('');
+  const [revealedResults, setRevealedResults] = useState<Record<number, boolean>>({});
+
   // 커피 내기 게임 컵 랜덤 셔플 초기화
   const initCoffeeGame = (count: number) => {
     const saltIdx = Math.floor(Math.random() * count);
@@ -245,6 +253,138 @@ function App() {
     setLooserName('');
     setShowReceipt(false);
     setIsCoffeeGameOpen(true);
+  };
+
+  // 사다리 타기 게임 초기화 및 생성
+  const initLadderGame = (count: number) => {
+    let defaultNames: string[] = [];
+    if (roomState && roomState.members) {
+      defaultNames = roomState.members.map(m => m.nickname);
+    } else {
+      defaultNames = Array.from({ length: count }, (_, i) => `참가자 ${i + 1}`);
+    }
+
+    if (defaultNames.length < count) {
+      const diff = count - defaultNames.length;
+      for (let i = 0; i < diff; i++) {
+        defaultNames.push(`참가자 ${defaultNames.length + 1}`);
+      }
+    } else if (defaultNames.length > count) {
+      defaultNames = defaultNames.slice(0, count);
+    }
+
+    // 기본 결과값: 1명 꽝(커피 쏘기), 나머지는 통과
+    const defaultResults: string[] = Array.from({ length: count }, (_, i) => i === 0 ? "커피 쏘기 💸" : "통과 ✨");
+    // 결과 셔플
+    for (let i = defaultResults.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const temp = defaultResults[i];
+      defaultResults[i] = defaultResults[j];
+      defaultResults[j] = temp;
+    }
+
+    setLadderPlayers(defaultNames);
+    setLadderResults(defaultResults);
+    setRevealedResults({});
+    setAnimatingPlayerIndex(null);
+    setLadderPath('');
+
+    // 사다리 다리(가로선) 무작위 생성
+    const newBridges: { from: number; to: number; y: number }[] = [];
+    const levels = 7;
+    const startY = 45;
+    const endY = 255;
+    const stepY = (endY - startY) / (levels + 1);
+
+    for (let l = 0; l < levels; l++) {
+      const y = startY + (l + 1) * stepY;
+      for (let c = 0; c < count - 1; c++) {
+        if (Math.random() < 0.45) {
+          newBridges.push({ from: c, to: c + 1, y });
+          c++; // 인접한 칸에 같은 레벨의 다리 겹침 방지
+        }
+      }
+    }
+
+    // 고립되는 라인 방지 로직 (모든 세로선이 최소 하나 이상의 가로선과 접하도록 보장)
+    const connected = new Set<number>();
+    newBridges.forEach(b => {
+      connected.add(b.from);
+      connected.add(b.to);
+    });
+
+    for (let c = 0; c < count; c++) {
+      if (!connected.has(c)) {
+        const targetCol = c === 0 ? 1 : c === count - 1 ? count - 2 : (Math.random() < 0.5 ? c - 1 : c + 1);
+        const randomLevel = Math.floor(Math.random() * levels);
+        const y = startY + (randomLevel + 1) * stepY;
+        const minCol = Math.min(c, targetCol);
+        const maxCol = Math.max(c, targetCol);
+        const exists = newBridges.some(b => b.y === y && b.from === minCol);
+        if (!exists) {
+          newBridges.push({ from: minCol, to: maxCol, y });
+        }
+      }
+    }
+
+    setLadderBridges(newBridges);
+  };
+
+  const getXCoords = (count: number) => {
+    const width = 500;
+    const padding = 40;
+    const activeWidth = width - padding * 2;
+    if (count <= 1) return [padding];
+    return Array.from({ length: count }, (_, i) => padding + i * (activeWidth / (count - 1)));
+  };
+
+  const getPlayerPath = (startIndex: number, bridgesList: { from: number; to: number; y: number }[], xCoords: number[], startY: number, endY: number) => {
+    let currCol = startIndex;
+    let currY = startY;
+    const pathPoints: [number, number][] = [[xCoords[currCol], currY]];
+    const sortedBridges = [...bridgesList].sort((a, b) => a.y - b.y);
+
+    for (const bridge of sortedBridges) {
+      if (bridge.y > currY) {
+        if (bridge.from === currCol) {
+          pathPoints.push([xCoords[currCol], bridge.y]);
+          pathPoints.push([xCoords[bridge.to], bridge.y]);
+          currCol = bridge.to;
+          currY = bridge.y;
+        } else if (bridge.to === currCol) {
+          pathPoints.push([xCoords[currCol], bridge.y]);
+          pathPoints.push([xCoords[bridge.from], bridge.y]);
+          currCol = bridge.from;
+          currY = bridge.y;
+        }
+      }
+    }
+    pathPoints.push([xCoords[currCol], endY]);
+    return { pathPoints, finalCol: currCol };
+  };
+
+  const handlePlayerCountChange = (val: number) => {
+    setPlayerCount(val);
+    initCoffeeGame(val);
+    initLadderGame(val);
+  };
+
+  const openMiniGame = (count: number) => {
+    initCoffeeGame(count);
+    initLadderGame(count);
+    setIsCoffeeGameOpen(true);
+  };
+
+  const handlePlayerNameChange = (idx: number, name: string) => {
+    const next = [...ladderPlayers];
+    next[idx] = name;
+    setLadderPlayers(next);
+  };
+
+  const handleResultChange = (idx: number, result: string) => {
+    const next = [...ladderResults];
+    next[idx] = result;
+    setLadderResults(next);
   };
 
   // 사운드 재생 헬퍼
@@ -1555,7 +1695,7 @@ function App() {
               </div>
               <button
                 type="button"
-                onClick={() => initCoffeeGame(4)}
+                onClick={() => openMiniGame(4)}
                 className="w-full py-2.5 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center cursor-pointer"
               >
                 커피 복불복 내기 시작
@@ -3174,214 +3314,480 @@ function App() {
                 </button>
               </div>
               <span className="text-[10px] font-black uppercase tracking-wider text-rose-950 bg-rose-100 self-start px-3 py-1 rounded-full shadow-inner">
-                🎮 커피빵 미니게임
+                🎮 {activeGameTab === 'coffee' ? '커피빵 미니게임' : '사다리 타기 미니게임'}
               </span>
               <h3 className="text-xl sm:text-2xl font-black tracking-tight mt-1 flex items-center gap-2">
-                소금 아메리카노 복불복 ☕
+                {activeGameTab === 'coffee' ? '소금 아메리카노 복불복 ☕' : '🪜 사다리 타기 게임'}
               </h3>
               <p className="text-xs sm:text-sm text-white/95 font-medium mt-0.5 leading-relaxed">
-                엎어진 컵 아래에 숨겨진 썩은 소금 아메리카노(꽝)를 피해 동료들과 쫄깃한 긴장감을 느껴보세요!
+                {activeGameTab === 'coffee' 
+                  ? '엎어진 컵 아래에 숨겨진 썩은 소금 아메리카노(꽝)를 피해 동료들과 쫄깃한 긴장감을 느껴보세요!'
+                  : '세로선 번호를 눌러 사다리를 타고 무작위 결과에 매칭되는 복불복 게임입니다.'}
               </p>
+            </div>
+
+            {/* 1.5 게임 탭 스위처 */}
+            <div className="flex border-b border-zinc-200 bg-white shrink-0">
+              <button
+                type="button"
+                onClick={() => setActiveGameTab('coffee')}
+                className={`flex-1 py-3 text-xs sm:text-sm font-black transition-colors border-b-2 flex items-center justify-center gap-2 ${
+                  activeGameTab === 'coffee'
+                    ? 'border-rose-500 text-rose-600 font-black'
+                    : 'border-transparent text-zinc-400 hover:text-zinc-600'
+                }`}
+              >
+                ☕ 소금커피 복불복
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveGameTab('ladder');
+                  if (ladderPlayers.length === 0) {
+                    initLadderGame(playerCount);
+                  }
+                }}
+                className={`flex-1 py-3 text-xs sm:text-sm font-black transition-colors border-b-2 flex items-center justify-center gap-2 ${
+                  activeGameTab === 'ladder'
+                    ? 'border-rose-500 text-rose-600 font-black'
+                    : 'border-transparent text-zinc-400 hover:text-zinc-600'
+                }`}
+              >
+                🪜 사다리 타기
+              </button>
             </div>
 
             {/* 2. 게임 플레이 스크롤 영역 */}
             <div className="overflow-y-auto p-5 sm:p-8 flex-grow bg-slate-50/50 flex flex-col items-center justify-start gap-6">
               
-              {/* A. 상단 컨트롤 패널 */}
-              <div className="w-full max-w-md bg-white border border-zinc-200/80 p-5 rounded-3xl shadow-sm flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs sm:text-sm font-black text-zinc-700 flex items-center gap-1.5">
-                    👥 내기 참여 인원
-                  </span>
-                  <span className="text-sm sm:text-base font-black text-rose-500 font-mono bg-rose-50 px-3 py-1 rounded-xl">
-                    {playerCount}명
-                  </span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <button 
-                    onClick={() => {
-                      const val = Math.max(3, playerCount - 1);
-                      setPlayerCount(val);
-                      initCoffeeGame(val);
-                    }}
-                    className="w-10 h-10 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200/50 text-zinc-600 font-black text-lg flex items-center justify-center cursor-pointer select-none"
-                  >
-                    -
-                  </button>
-                  <input 
-                    type="range" 
-                    min="3" 
-                    max="8" 
-                    value={playerCount} 
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value, 10);
-                      setPlayerCount(val);
-                      initCoffeeGame(val);
-                    }}
-                    className="flex-grow h-2 bg-zinc-100 rounded-lg appearance-none cursor-pointer accent-rose-500"
-                  />
-                  <button 
-                    onClick={() => {
-                      const val = Math.min(8, playerCount + 1);
-                      setPlayerCount(val);
-                      initCoffeeGame(val);
-                    }}
-                    className="w-10 h-10 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200/50 text-zinc-600 font-black text-lg flex items-center justify-center cursor-pointer select-none"
-                  >
-                    +
-                  </button>
-                </div>
-                <button 
-                  onClick={() => initCoffeeGame(playerCount)}
-                  className="w-full py-3 bg-rose-500 hover:bg-rose-600 text-white font-black text-xs rounded-2xl transition-all shadow-md shadow-rose-500/20 cursor-pointer"
-                >
-                  🔄 컵 다시 섞기
-                </button>
-              </div>
-
-              {/* B. 게임 플레이 영역 (하이브리드 3D 쉘 렌더링 적용) */}
-              {gameStatus === 'playing' && (
-                <div className="w-full max-w-lg mt-2 animate-slide-up">
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 justify-items-center">
-                    {cupStates.map((cup, idx) => (
-                      <div 
-                        key={idx}
-                        onClick={() => handleCupClick(idx)}
-                        className="relative w-20 h-24 sm:w-24 sm:h-28 cursor-pointer perspective-1000 group select-none"
+              {activeGameTab === 'coffee' ? (
+                <>
+                  {/* A. 상단 컨트롤 패널 */}
+                  <div className="w-full max-w-md bg-white border border-zinc-200/80 p-5 rounded-3xl shadow-sm flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs sm:text-sm font-black text-zinc-700 flex items-center gap-1.5">
+                        👥 내기 참여 인원
+                      </span>
+                      <span className="text-sm sm:text-base font-black text-rose-500 font-mono bg-rose-50 px-3 py-1 rounded-xl">
+                        {playerCount}명
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <button 
+                        onClick={() => handlePlayerCountChange(Math.max(3, playerCount - 1))}
+                        className="w-10 h-10 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200/50 text-zinc-600 font-black text-lg flex items-center justify-center cursor-pointer select-none"
                       >
-                        <div 
-                          className={`relative w-full h-full rounded-2xl transition-transform duration-500 preserve-3d shadow-sm ${
-                            cup.flipped ? '[transform:rotateY(180deg)]' : 'group-hover:scale-105'
-                          }`}
-                        >
-                          {/* 컵 앞면 (엎어져 있는 상태) */}
-                          <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700 rounded-2xl flex flex-col items-center justify-center gap-1 backface-hidden text-white">
-                            <span className="text-xl sm:text-2xl animate-pulse">☕</span>
-                            <span className="text-[10px] font-black font-mono text-zinc-400">CUP {idx + 1}</span>
-                          </div>
-
-                          {/* 컵 뒷면 (뒤집힌 상태 - 커피 또는 소금) */}
-                          {/* 앞뒷면 컨테이너는 항상 존재하지만 내부 이모지와 라벨은 flipped 상태일 때만 생성하여 정보 원천 차단 */}
-                          <div className={`absolute inset-0 border rounded-2xl flex flex-col items-center justify-center [transform:rotateY(180deg)] backface-hidden ${
-                            cup.isSalt 
-                              ? 'bg-gradient-to-br from-red-50 to-rose-100 border-red-300 text-red-500' 
-                              : 'bg-gradient-to-br from-amber-50 to-orange-100 border-orange-300 text-amber-800'
-                          }`}>
-                            {cup.flipped && (
-                              cup.isSalt ? (
-                                <>
-                                  <span className="text-3xl animate-bounce">💀🧂</span>
-                                  <span className="text-[9px] font-black text-red-600 bg-red-100 px-1.5 py-0.5 rounded-md mt-1 font-mono">폭탄 당첨</span>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="text-2xl">☕✨</span>
-                                  <span className="text-[9px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-md mt-1 font-mono">SAFE</span>
-                                </>
-                              )
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* C. 꽝 발생: 당첨자 이름 입력 화면 */}
-              {gameStatus === 'gameover' && !showReceipt && (
-                <div className="w-full max-w-md bg-white border border-rose-100 p-6 rounded-3xl shadow-xl flex flex-col items-center gap-5 text-center border-t-4 border-t-rose-500 animate-slide-up mt-2">
-                  <span className="text-5xl animate-bounce">💀🧂</span>
-                  <div className="flex flex-col gap-1.5">
-                    <h4 className="text-base font-black text-zinc-800">소금 폭탄 아메리카노 당첨!</h4>
-                    <p className="text-xs text-zinc-500 font-medium">영광의 커피 골든벨을 울릴 주인공의 성함/닉네임을 입력하세요.</p>
-                  </div>
-                  <input 
-                    type="text" 
-                    value={looserName} 
-                    onChange={(e) => setLooserName(e.target.value)}
-                    placeholder="예: 홍대리, 김과장"
-                    maxLength={10}
-                    className="w-full px-4 py-3 border border-zinc-200 focus:border-rose-500 rounded-2xl font-bold text-center text-zinc-800 focus:outline-none shadow-sm transition-all"
-                  />
-                  <button 
-                    onClick={() => {
-                      if (!looserName.trim()) return;
-                      setShowReceipt(true);
-                      playAudio('https://assets.mixkit.co/active_storage/sfx/1657/1657-200.wav');
-                    }}
-                    disabled={!looserName.trim()}
-                    className="w-full py-3.5 bg-rose-500 hover:bg-rose-600 disabled:bg-zinc-300 text-white font-black text-xs rounded-2xl transition-all shadow-md cursor-pointer select-none"
-                  >
-                    🧾 골든벨 영수증 발급하기
-                  </button>
-                </div>
-              )}
-
-              {/* D. 최종 골든벨 영수증 렌더링 */}
-              {gameStatus === 'gameover' && showReceipt && (
-                <div className="w-full max-w-xs bg-white border-2 border-dashed border-zinc-300 p-6 rounded-3xl shadow-2xl flex flex-col gap-4 text-zinc-800 relative font-mono overflow-hidden animate-receipt-roll mt-2">
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-[repeating-linear-gradient(90deg,#000,#000_10px,transparent_10px,transparent_20px)] opacity-10" />
-                  
-                  <div className="text-center flex flex-col gap-1 border-b border-dashed border-zinc-300 pb-4">
-                    <h3 className="text-sm font-black tracking-widest text-zinc-800 uppercase">☕ [아무거나 커피숍] ☕</h3>
-                    <span className="text-[9px] font-bold text-zinc-400">AMUGEONA COFFEE SHOP (DSR BLDG)</span>
-                    <span className="text-[9px] font-bold text-zinc-400">TEL: 02-1234-5678</span>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5 text-[10px] font-bold border-b border-dashed border-zinc-300 pb-4">
-                    <div className="flex justify-between">
-                      <span>발행일시:</span>
-                      <span>{new Date().toISOString().replace('T', ' ').substring(0, 19)}</span>
+                        -
+                      </button>
+                      <input 
+                        type="range" 
+                        min="3" 
+                        max="8" 
+                        value={playerCount} 
+                        onChange={(e) => handlePlayerCountChange(parseInt(e.target.value, 10))}
+                        className="flex-grow h-2 bg-zinc-100 rounded-lg appearance-none cursor-pointer accent-rose-500"
+                      />
+                      <button 
+                        onClick={() => handlePlayerCountChange(Math.min(8, playerCount + 1))}
+                        className="w-10 h-10 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200/50 text-zinc-600 font-black text-lg flex items-center justify-center cursor-pointer select-none"
+                      >
+                        +
+                      </button>
                     </div>
-                    <div className="flex justify-between">
-                      <span>주문번호:</span>
-                      <span># {Math.floor(Math.random() * 90000) + 10000}</span>
-                    </div>
-                    <div className="flex justify-between text-rose-500">
-                      <span>당첨구분:</span>
-                      <span>소금 커피 골든벨 당첨 🔔</span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-2.5 text-[10px] font-bold border-b border-dashed border-zinc-300 pb-4">
-                    <div className="flex justify-between text-zinc-400 font-extrabold text-[9px] uppercase">
-                      <span>상품명 [QTY]</span>
-                      <span>금액</span>
-                    </div>
-                    <div className="flex justify-between text-zinc-800">
-                      <span>💀 소금 아메리카노 [1]</span>
-                      <span>₩ 55,000</span>
-                    </div>
-                    <div className="flex justify-between text-zinc-800">
-                      <span>💖 동료들의 사랑/박수 [{playerCount - 1}]</span>
-                      <span>₩ 0 (Priceless)</span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-2 text-xs font-black pt-2 text-center">
-                    <div className="flex justify-between text-rose-600 border-b border-dashed border-zinc-200 pb-2">
-                      <span>최종 결제자:</span>
-                      <span>{looserName} 💸</span>
-                    </div>
-                    <p className="text-[10px] text-zinc-500 mt-2 font-black leading-relaxed">
-                      "오늘 커피는 {looserName}님이 시원하게 쏘십니다! 다들 감사히 잘 먹겠습니다! 😍☕"
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-zinc-200">
-                    <button 
-                      onClick={handleKakaoShareReceipt}
-                      className="w-full py-3 bg-[#FEE500] hover:bg-[#FDD000] text-zinc-900 font-black text-xs rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-xs"
-                    >
-                      💬 단톡방에 골든벨 박제하기
-                    </button>
                     <button 
                       onClick={() => initCoffeeGame(playerCount)}
-                      className="w-full py-3 bg-zinc-800 hover:bg-zinc-900 text-white font-black text-xs rounded-2xl cursor-pointer transition-colors shadow-xs"
+                      className="w-full py-3 bg-rose-500 hover:bg-rose-600 text-white font-black text-xs rounded-2xl transition-all shadow-md shadow-rose-500/20 cursor-pointer"
                     >
-                      🔄 한 판 더 하기!
+                      🔄 컵 다시 섞기
                     </button>
+                  </div>
+
+                  {/* B. 게임 플레이 영역 (하이브리드 3D 쉘 렌더링 적용) */}
+                  {gameStatus === 'playing' && (
+                    <div className="w-full max-w-lg mt-2 animate-slide-up">
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 justify-items-center">
+                        {cupStates.map((cup, idx) => (
+                          <div 
+                            key={idx}
+                            onClick={() => handleCupClick(idx)}
+                            className="relative w-20 h-24 sm:w-24 sm:h-28 cursor-pointer perspective-1000 group select-none"
+                          >
+                            <div 
+                              className={`relative w-full h-full rounded-2xl transition-transform duration-500 preserve-3d shadow-sm ${
+                                cup.flipped ? '[transform:rotateY(180deg)]' : 'group-hover:scale-105'
+                              }`}
+                            >
+                              {/* 컵 앞면 (엎어져 있는 상태) */}
+                              <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700 rounded-2xl flex flex-col items-center justify-center gap-1 backface-hidden text-white">
+                                <span className="text-xl sm:text-2xl animate-pulse">☕</span>
+                                <span className="text-[10px] font-black font-mono text-zinc-400">CUP {idx + 1}</span>
+                              </div>
+
+                              {/* 컵 뒷면 (뒤집힌 상태 - 커피 또는 소금) */}
+                              <div className={`absolute inset-0 border rounded-2xl flex flex-col items-center justify-center [transform:rotateY(180deg)] backface-hidden ${
+                                cup.isSalt 
+                                  ? 'bg-gradient-to-br from-red-50 to-rose-100 border-red-300 text-red-500' 
+                                  : 'bg-gradient-to-br from-amber-50 to-orange-100 border-orange-300 text-amber-800'
+                              }`}>
+                                {cup.flipped && (
+                                  cup.isSalt ? (
+                                    <>
+                                      <span className="text-3xl animate-bounce">💀🧂</span>
+                                      <span className="text-[9px] font-black text-red-600 bg-red-100 px-1.5 py-0.5 rounded-md mt-1 font-mono">폭탄 당첨</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="text-2xl">☕✨</span>
+                                      <span className="text-[9px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-md mt-1 font-mono">SAFE</span>
+                                    </>
+                                  )
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* C. 꽝 발생: 당첨자 이름 입력 화면 */}
+                  {gameStatus === 'gameover' && !showReceipt && (
+                    <div className="w-full max-w-md bg-white border border-rose-100 p-6 rounded-3xl shadow-xl flex flex-col items-center gap-5 text-center border-t-4 border-t-rose-500 animate-slide-up mt-2">
+                      <span className="text-5xl animate-bounce">💀🧂</span>
+                      <div className="flex flex-col gap-1.5">
+                        <h4 className="text-base font-black text-zinc-800">소금 폭탄 아메리카노 당첨!</h4>
+                        <p className="text-xs text-zinc-500 font-medium">영광의 커피 골든벨을 울릴 주인공의 성함/닉네임을 입력하세요.</p>
+                      </div>
+                      <input 
+                        type="text" 
+                        value={looserName} 
+                        onChange={(e) => setLooserName(e.target.value)}
+                        placeholder="예: 홍대리, 김과장"
+                        maxLength={10}
+                        className="w-full px-4 py-3 border border-zinc-200 focus:border-rose-500 rounded-2xl font-bold text-center text-zinc-800 focus:outline-none shadow-sm transition-all"
+                      />
+                      <button 
+                        onClick={() => {
+                          if (!looserName.trim()) return;
+                          setShowReceipt(true);
+                          playAudio('https://assets.mixkit.co/active_storage/sfx/1657/1657-200.wav');
+                        }}
+                        disabled={!looserName.trim()}
+                        className="w-full py-3.5 bg-rose-500 hover:bg-rose-600 disabled:bg-zinc-300 text-white font-black text-xs rounded-2xl transition-all shadow-md cursor-pointer select-none"
+                      >
+                        🧾 골든벨 영수증 발급하기
+                      </button>
+                    </div>
+                  )}
+
+                  {/* D. 최종 골든벨 영수증 렌더링 */}
+                  {gameStatus === 'gameover' && showReceipt && (
+                    <div className="w-full max-w-xs bg-white border-2 border-dashed border-zinc-300 p-6 rounded-3xl shadow-2xl flex flex-col gap-4 text-zinc-800 relative font-mono overflow-hidden animate-receipt-roll mt-2">
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-[repeating-linear-gradient(90deg,#000,#000_10px,transparent_10px,transparent_20px)] opacity-10" />
+                      
+                      <div className="text-center flex flex-col gap-1 border-b border-dashed border-zinc-300 pb-4">
+                        <h3 className="text-sm font-black tracking-widest text-zinc-800 uppercase">☕ [아무거나 커피숍] ☕</h3>
+                        <span className="text-[9px] font-bold text-zinc-400">AMUGEONA COFFEE SHOP (DSR BLDG)</span>
+                        <span className="text-[9px] font-bold text-zinc-400">TEL: 02-1234-5678</span>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5 text-[10px] font-bold border-b border-dashed border-zinc-300 pb-4">
+                        <div className="flex justify-between">
+                          <span>발행일시:</span>
+                          <span>{new Date().toISOString().replace('T', ' ').substring(0, 19)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>주문번호:</span>
+                          <span># {Math.floor(Math.random() * 90000) + 10000}</span>
+                        </div>
+                        <div className="flex justify-between text-rose-500">
+                          <span>당첨구분:</span>
+                          <span>소금 커피 골든벨 당첨 🔔</span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2.5 text-[10px] font-bold border-b border-dashed border-zinc-300 pb-4">
+                        <div className="flex justify-between text-zinc-400 font-extrabold text-[9px] uppercase">
+                          <span>상품명 [QTY]</span>
+                          <span>금액</span>
+                        </div>
+                        <div className="flex justify-between text-zinc-800">
+                          <span>💀 소금 아메리카노 [1]</span>
+                          <span>₩ 55,000</span>
+                        </div>
+                        <div className="flex justify-between text-zinc-800">
+                          <span>💖 동료들의 사랑/박수 [{playerCount - 1}]</span>
+                          <span>₩ 0 (Priceless)</span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2 text-xs font-black pt-2 text-center">
+                        <div className="flex justify-between text-rose-600 border-b border-dashed border-zinc-200 pb-2">
+                          <span>최종 결제자:</span>
+                          <span>{looserName} 💸</span>
+                        </div>
+                        <p className="text-[10px] text-zinc-500 mt-2 font-black leading-relaxed">
+                          "오늘 커피는 {looserName}님이 시원하게 쏘십니다! 다들 감사히 잘 먹겠습니다! 😍☕"
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-zinc-200">
+                        <button 
+                          onClick={handleKakaoShareReceipt}
+                          className="w-full py-3 bg-[#FEE500] hover:bg-[#FDD000] text-zinc-900 font-black text-xs rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-xs"
+                        >
+                          💬 단톡방에 골든벨 박제하기
+                        </button>
+                        <button 
+                          onClick={() => initCoffeeGame(playerCount)}
+                          className="w-full py-3 bg-zinc-800 hover:bg-zinc-900 text-white font-black text-xs rounded-2xl cursor-pointer transition-colors shadow-xs"
+                        >
+                          🔄 한 판 더 하기!
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="w-full flex flex-col gap-6 items-center">
+                  {/* A. 컨트롤 패널 */}
+                  <div className="w-full max-w-md bg-white border border-zinc-200/80 p-5 rounded-3xl shadow-sm flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs sm:text-sm font-black text-zinc-700 flex items-center gap-1.5">
+                        👥 참여 인원 설정
+                      </span>
+                      <span className="text-sm sm:text-base font-black text-rose-500 font-mono bg-rose-50 px-3 py-1 rounded-xl">
+                        {playerCount}명
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <button 
+                        type="button"
+                        onClick={() => handlePlayerCountChange(Math.max(3, playerCount - 1))}
+                        className="w-10 h-10 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200/50 text-zinc-600 font-black text-lg flex items-center justify-center cursor-pointer select-none disabled:opacity-50"
+                        disabled={animatingPlayerIndex !== null}
+                      >
+                        -
+                      </button>
+                      <input 
+                        type="range" 
+                        min="3" 
+                        max="8" 
+                        value={playerCount} 
+                        onChange={(e) => handlePlayerCountChange(parseInt(e.target.value, 10))}
+                        disabled={animatingPlayerIndex !== null}
+                        className="flex-grow h-2 bg-zinc-100 rounded-lg appearance-none cursor-pointer accent-rose-500 disabled:opacity-50"
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => handlePlayerCountChange(Math.min(8, playerCount + 1))}
+                        className="w-10 h-10 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200/50 text-zinc-600 font-black text-lg flex items-center justify-center cursor-pointer select-none disabled:opacity-50"
+                        disabled={animatingPlayerIndex !== null}
+                      >
+                        +
+                      </button>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => initLadderGame(playerCount)}
+                      className="w-full py-3 bg-rose-500 hover:bg-rose-600 text-white font-black text-xs rounded-2xl transition-all shadow-md shadow-rose-500/20 cursor-pointer disabled:opacity-50"
+                      disabled={animatingPlayerIndex !== null}
+                    >
+                      🔄 사다리 다시 생성
+                    </button>
+                  </div>
+
+                  {/* B. 사다리 시각화 영역 */}
+                  <div className="w-full bg-white border border-zinc-200/80 p-5 rounded-3xl shadow-sm flex flex-col items-center select-none overflow-hidden">
+                    <p className="text-[10px] text-zinc-400 font-black mb-3 text-center">
+                      💡 상단의 번호 버튼(①, ②...)을 클릭하면 사다리를 타고 내려갑니다!
+                    </p>
+                    
+                    <div className="w-full overflow-x-auto py-2 flex justify-center">
+                      <svg viewBox="0 0 500 320" className="w-full max-w-[480px] min-w-[280px] h-auto overflow-visible">
+                        {/* Vertical Lines */}
+                        {getXCoords(playerCount).map((x, i) => (
+                          <line
+                            key={`v-${i}`}
+                            x1={x}
+                            y1={35}
+                            x2={x}
+                            y2={265}
+                            className="stroke-zinc-200 stroke-2"
+                          />
+                        ))}
+
+                        {/* Bridges (Horizontal Lines) */}
+                        {ladderBridges.map((bridge, idx) => {
+                          const xCoords = getXCoords(playerCount);
+                          return (
+                            <line
+                              key={`b-${idx}`}
+                              x1={xCoords[bridge.from]}
+                              y1={bridge.y}
+                              x2={xCoords[bridge.to]}
+                              y2={bridge.y}
+                              className="stroke-zinc-300 stroke-2"
+                            />
+                          );
+                        })}
+
+                        {/* Animating path */}
+                        {animatingPlayerIndex !== null && ladderPath && (
+                          <path
+                            d={ladderPath}
+                            fill="none"
+                            stroke="#f43f5e" /* rose-500 */
+                            strokeWidth={4}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="shadow-sm"
+                          />
+                        )}
+
+                        {/* Moving avatar along the path */}
+                        {animatingPlayerIndex !== null && ladderPath && (
+                          <g>
+                            <circle r="7" fill="#f43f5e" className="shadow-lg filter drop-shadow-md">
+                              <animateMotion
+                                key={animatingPlayerIndex}
+                                dur="2s"
+                                repeatCount="1"
+                                path={ladderPath}
+                                fill="freeze"
+                              />
+                            </circle>
+                          </g>
+                        )}
+
+                        {/* Player badges at the top */}
+                        {getXCoords(playerCount).map((x, i) => (
+                          <g key={`p-badge-${i}`} className="cursor-pointer" onClick={() => {
+                            if (animatingPlayerIndex === null) {
+                              const xCoords = getXCoords(playerCount);
+                              const { pathPoints, finalCol } = getPlayerPath(i, ladderBridges, xCoords, 35, 265);
+                              const pathD = pathPoints.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p[0]} ${p[1]}`).join(' ');
+                              
+                              setLadderPath(pathD);
+                              setAnimatingPlayerIndex(i);
+                              playAudio('https://assets.mixkit.co/active_storage/sfx/2019/2019-200.wav');
+                              
+                              setTimeout(() => {
+                                setRevealedResults(prev => ({ ...prev, [finalCol]: true }));
+                                setAnimatingPlayerIndex(null);
+                                
+                                const resultText = ladderResults[finalCol];
+                                if (resultText.includes('커피') || resultText.includes('쏘기') || resultText.includes('꽝')) {
+                                  playAudio('https://assets.mixkit.co/active_storage/sfx/2869/2869-200.wav');
+                                  if (navigator.vibrate) {
+                                    navigator.vibrate([200, 100, 200]);
+                                  }
+                                } else {
+                                  playAudio('https://assets.mixkit.co/active_storage/sfx/2017/2017-200.wav');
+                                }
+                              }, 2000);
+                            }
+                          }}>
+                            {/* Player Name */}
+                            <text x={x} y={15} textAnchor="middle" className="text-[10px] font-black fill-zinc-600">
+                              {ladderPlayers[i] || `참가자 ${i + 1}`}
+                            </text>
+                            {/* Circular Button */}
+                            <circle
+                              cx={x}
+                              cy={35}
+                              r={12}
+                              className={`transition-colors shadow-xs ${
+                                animatingPlayerIndex === i ? 'fill-rose-500' : 'fill-zinc-800 hover:fill-zinc-700'
+                              }`}
+                            />
+                            <text x={x} y={38} textAnchor="middle" className="text-[9px] font-black fill-white pointer-events-none">
+                              {i + 1}
+                            </text>
+                          </g>
+                        ))}
+
+                        {/* Results badges at the bottom */}
+                        {getXCoords(playerCount).map((x, i) => {
+                          const isRevealed = revealedResults[i];
+                          return (
+                            <g key={`res-badge-${i}`}>
+                              <rect
+                                x={x - 32}
+                                y={265}
+                                width={64}
+                                height={22}
+                                rx={6}
+                                className={`stroke-1 transition-all ${
+                                  isRevealed
+                                    ? ladderResults[i].includes('커피') || ladderResults[i].includes('꽝') || ladderResults[i].includes('쏘기')
+                                      ? 'fill-red-50 stroke-red-200'
+                                      : 'fill-emerald-50 stroke-emerald-200'
+                                    : 'fill-zinc-100 stroke-zinc-200'
+                                }`}
+                              />
+                              <text
+                                x={x}
+                                y={279}
+                                textAnchor="middle"
+                                className={`text-[8.5px] font-black pointer-events-none ${
+                                  isRevealed
+                                    ? ladderResults[i].includes('커피') || ladderResults[i].includes('꽝') || ladderResults[i].includes('쏘기')
+                                      ? 'fill-red-700'
+                                      : 'fill-emerald-700'
+                                    : 'fill-zinc-400 animate-pulse'
+                                }`}
+                              >
+                                {isRevealed ? ladderResults[i] : '🔍 클릭대기'}
+                              </text>
+                            </g>
+                          );
+                        })}
+                      </svg>
+                    </div>
+                    
+                    {/* Reset Revealed Results */}
+                    <button
+                      type="button"
+                      onClick={() => setRevealedResults({})}
+                      className="mt-4 px-4 py-2 border border-zinc-200 hover:bg-zinc-50 text-zinc-500 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                      disabled={animatingPlayerIndex !== null}
+                    >
+                      🔓 결과 가리기 (재게임)
+                    </button>
+                  </div>
+
+                  {/* C. 참가자 및 결과 편집 리스트 */}
+                  <div className="w-full bg-white border border-zinc-200/80 p-5 rounded-3xl shadow-sm flex flex-col gap-4">
+                    <h4 className="text-xs sm:text-sm font-black text-zinc-700 border-b border-zinc-100 pb-2 flex items-center justify-between">
+                      <span>📝 참가자명 & 결과 직접 수정</span>
+                      <span className="text-[10px] text-zinc-400 font-medium">실시간 편집 가능</span>
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-1 w-full">
+                      {Array.from({ length: playerCount }).map((_, i) => (
+                        <div key={`edit-row-${i}`} className="flex items-center gap-2 bg-zinc-50 p-2.5 rounded-xl border border-zinc-100">
+                          <span className="text-xs font-black text-zinc-400 font-mono w-5">#{i+1}</span>
+                          <div className="flex-1 flex flex-col gap-1">
+                            <input
+                              type="text"
+                              value={ladderPlayers[i] || ''}
+                              onChange={(e) => handlePlayerNameChange(i, e.target.value)}
+                              placeholder={`참가자 ${i + 1}`}
+                              className="w-full px-2 py-1 text-[11px] border border-zinc-200 focus:border-rose-400 rounded-md font-semibold bg-white text-zinc-800 focus:outline-none"
+                              disabled={animatingPlayerIndex !== null}
+                            />
+                            <input
+                              type="text"
+                              value={ladderResults[i] || ''}
+                              onChange={(e) => handleResultChange(i, e.target.value)}
+                              placeholder="통과 ✨"
+                              className="w-full px-2 py-1 text-[10px] border border-zinc-200 focus:border-rose-400 rounded-md font-bold bg-white text-rose-600 focus:outline-none"
+                              disabled={animatingPlayerIndex !== null}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
@@ -3389,7 +3795,11 @@ function App() {
 
             {/* 3. 모달 하단 퀵 액션 */}
             <div className="bg-zinc-50/80 border-t border-zinc-200 p-4 shrink-0 flex items-center justify-between gap-4 text-xs font-bold text-zinc-500 sm:px-6">
-              <span className="text-rose-500 flex items-center gap-1 font-black">⚡ 엎어진 커피컵들 중 소금 폭탄 아메리카노 💀가 숨겨져 있습니다! 한 명씩 터치하세요!</span>
+              <span className="text-rose-500 flex items-center gap-1 font-black">
+                {activeGameTab === 'coffee' 
+                  ? '⚡ 엎어진 커피컵들 중 소금 폭탄 아메리카노 💀가 숨겨져 있습니다! 한 명씩 터치하세요!'
+                  : '⚡ 번호를 클릭하여 사다리 타기 결과를 확인해 보세요! 모든 결과를 직접 편집하여 커스텀 벌칙을 세팅할 수도 있습니다.'}
+              </span>
               <button 
                 onClick={() => setIsCoffeeGameOpen(false)}
                 className="px-4 py-2 bg-zinc-800 hover:bg-zinc-900 text-white rounded-lg transition-colors cursor-pointer shrink-0"
