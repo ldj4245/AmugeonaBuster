@@ -162,6 +162,7 @@ function App() {
   const [submittingReview, setSubmittingReview] = useState(false);
   const [submittedReviewCourses, setSubmittedReviewCourses] = useState<Record<string, boolean>>({});
   const [isReviewInputFocused, setIsReviewInputFocused] = useState(false);
+  const [isCompactView, setIsCompactView] = useState(true); // 모바일 한눈에 보기를 위한 기본 콤팩트 뷰 설정
 
   // 📱 PWA 설치 관련 상태 변수 및 로직
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -2265,13 +2266,40 @@ function App() {
               </p>
             </div>
 
-            {/* 시간대별 4단 식단 필터 탭 바 (아침 / 점심 / 저녁 / 전체보기) */}
+            {/* 시간대별 4단 식단 필터 탭 바 및 뷰 토글 */}
             {!menuDetailLoading && !menuDetailError && menuDetailCourses.length > 0 && (
-              <div className="bg-white border-b border-zinc-200/80 px-5 py-3 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 select-none animate-slide-down">
-                <span className="text-xs font-black text-zinc-700 tracking-tight flex items-center gap-1.5 whitespace-nowrap shrink-0">
-                  🕒 오늘 제공 식단 필터
-                </span>
-                <div className="flex bg-zinc-100/80 p-1 rounded-xl border border-zinc-200/30 gap-1 w-full sm:w-auto justify-between sm:justify-start shadow-inner">
+              <div className="bg-white border-b border-zinc-200/80 px-5 py-3 shrink-0 flex flex-col lg:flex-row lg:items-center justify-between gap-4 select-none animate-slide-down">
+                <div className="flex items-center justify-between gap-3 w-full lg:w-auto">
+                  <span className="text-xs font-black text-zinc-700 tracking-tight flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                    🕒 오늘 제공 식단 필터
+                  </span>
+                  
+                  {/* 한눈에 보기(콤팩트) / 카드형 뷰 토글 버튼 */}
+                  <div className="flex bg-zinc-100/80 p-0.5 rounded-lg border border-zinc-200/30 shadow-inner text-[10px] font-bold">
+                    <button 
+                      onClick={() => setIsCompactView(true)}
+                      className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                        isCompactView 
+                          ? 'bg-white text-orange-600 shadow-xs' 
+                          : 'text-zinc-400 hover:text-zinc-600'
+                      }`}
+                    >
+                      📜 한눈에 보기
+                    </button>
+                    <button 
+                      onClick={() => setIsCompactView(false)}
+                      className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                        !isCompactView 
+                          ? 'bg-white text-orange-600 shadow-xs' 
+                          : 'text-zinc-400 hover:text-zinc-600'
+                      }`}
+                    >
+                      🎨 카드형
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex bg-zinc-100/80 p-1 rounded-xl border border-zinc-200/30 gap-1 w-full lg:w-auto justify-between lg:justify-start shadow-inner">
                   {[
                     { key: 'all', label: '전체보기' },
                     { key: 'breakfast', label: '아침 ☀️' },
@@ -2281,7 +2309,7 @@ function App() {
                     <button
                       key={tab.key}
                       onClick={() => setMenuMealFilter(tab.key as any)}
-                      className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer whitespace-nowrap text-center ${
+                      className={`flex-1 lg:flex-none px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer whitespace-nowrap text-center ${
                         menuMealFilter === tab.key
                           ? 'bg-white text-orange-600 shadow-sm border border-zinc-200/50 scale-[1.02]'
                           : 'text-zinc-500 hover:text-zinc-700'
@@ -2397,8 +2425,8 @@ function App() {
                   }
 
                   return (
-                    <div className="overflow-y-auto overscroll-contain p-5 sm:p-8 flex-grow bg-slate-50/50">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="overflow-y-auto overscroll-contain p-4 sm:p-8 flex-grow bg-slate-50/50">
+                      <div className={isCompactView ? "flex flex-col gap-3 animate-fade-in" : "grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in"}>
                         {filteredCourses.map((course: any, idx: number) => {
                           const { badgeGradient, courseEmoji } = getCourseStyle(course.courseName);
                           
@@ -2408,13 +2436,445 @@ function App() {
                           
                           const mainDish = dishes[0] || '식단 준비 중';
                           const sideDishes = dishes.slice(1);
-                          
+
+                          if (isCompactView) {
+                            return (
+                              <div 
+                                key={idx} 
+                                className="relative bg-white border border-zinc-200 hover:border-orange-300 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between gap-3 overflow-hidden group"
+                              >
+                                <div className={`absolute top-0 bottom-0 left-0 w-1.5 bg-gradient-to-b ${badgeGradient}`} />
+
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pl-2">
+                                  <div className="flex items-center gap-3 flex-grow min-w-0">
+                                    {/* 썸네일 이미지 (콤팩트 미니) */}
+                                    <div className="w-12 h-12 rounded-xl overflow-hidden bg-zinc-100 border border-zinc-100 shrink-0 shadow-inner">
+                                      <img 
+                                        src={getCourseImage(course.courseName, course.imageUrl)} 
+                                        alt={course.courseName} 
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                          e.currentTarget.src = getCourseImage(course.courseName);
+                                        }}
+                                      />
+                                    </div>
+
+                                    <div className="flex flex-col gap-1 min-w-0 flex-grow">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className={`text-[9px] font-black text-white bg-gradient-to-r ${badgeGradient} px-2 py-0.5 rounded-md`}>
+                                          {courseEmoji} {course.courseName}
+                                        </span>
+                                        {course.price && (
+                                          <span className="text-[9px] font-bold text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded-md font-mono">
+                                            💰 {course.price}
+                                          </span>
+                                        )}
+                                        {course.calories > 0 && (
+                                          <span className="text-[9px] font-bold text-zinc-400">
+                                            🔥 {course.calories} kcal
+                                          </span>
+                                        )}
+                                      </div>
+                                      <h4 className="text-xs sm:text-sm font-black text-zinc-800 truncate" title={mainDish}>
+                                        {mainDish}
+                                      </h4>
+                                      {sideDishes.length > 0 && (
+                                        <p className="text-[10px] text-zinc-400 font-medium truncate" title={sideDishes.join(', ')}>
+                                          🥗 {sideDishes.join(', ')}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* 별점 및 리뷰 액션 */}
+                                  <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0 pl-15 sm:pl-0 select-none">
+                                    <button
+                                      onClick={() => {
+                                        const isOpen = expandedReviewCourseName === course.courseName;
+                                        setExpandedReviewCourseName(isOpen ? null : course.courseName);
+                                        if (!isOpen) {
+                                          fetchCourseReviews(menuDetailCafeteriaName, menuDetailDate);
+                                        }
+                                      }}
+                                      className="text-[10px] font-black text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/40 px-2.5 py-1.5 rounded-xl flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                                    >
+                                      <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
+                                      <span>{reviewStats[course.courseName]?.averageRating || '0.0'}</span>
+                                      <span className="text-zinc-400 font-normal">({reviewStats[course.courseName]?.reviewCount || 0})</span>
+                                    </button>
+                                    
+                                    {!submittedReviewCourses[`${menuDetailCafeteriaName}-${menuDetailDate}-${course.courseName}`] ? (
+                                      <button
+                                        onClick={() => {
+                                          if (activeReviewWriteCourseName === course.courseName) {
+                                            setActiveReviewWriteCourseName(null);
+                                            setIsReviewInputFocused(false);
+                                          } else {
+                                            handleOpenReviewWrite(course.courseName);
+                                          }
+                                        }}
+                                        className="text-[10px] font-black text-white bg-orange-500 hover:bg-orange-600 px-3 py-1.5 rounded-xl flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
+                                      >
+                                        ✍️ 후기
+                                      </button>
+                                    ) : (
+                                      <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-xl">
+                                        👍 완료
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* 콤팩트 아코디언 후기 보기/작성 영역 */}
+                                {(expandedReviewCourseName === course.courseName || activeReviewWriteCourseName === course.courseName) && (
+                                  <div className="border-t border-zinc-100 pt-3 flex flex-col gap-3 animate-slide-down">
+                                    {/* 후기 작성 폼 */}
+                                    {activeReviewWriteCourseName === course.courseName && (
+                                      <div className="bg-slate-50/70 border border-zinc-200/60 p-4 rounded-2xl flex flex-col gap-3.5 shadow-inner">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <span className="text-[10px] font-black text-zinc-700">✍️ 오늘의 식단 한줄평</span>
+                                          <div className="flex items-center gap-1">
+                                            {[1, 2, 3, 4, 5].map((num) => (
+                                              <button
+                                                key={num}
+                                                type="button"
+                                                onClick={() => setNewReviewRating(num)}
+                                                className="focus:outline-hidden cursor-pointer p-0.5"
+                                              >
+                                                <Star
+                                                  className={`w-4 h-4 transition-colors ${
+                                                    num <= newReviewRating ? 'fill-amber-400 text-amber-400' : 'text-zinc-300'
+                                                  }`}
+                                                />
+                                              </button>
+                                            ))}
+                                          </div>
+                                        </div>
+
+                                        <div className="flex gap-2">
+                                          <div className="flex flex-col gap-1 w-2/5">
+                                            <span className="text-[9px] font-black text-zinc-400 tracking-wider">닉네임</span>
+                                            <input
+                                              type="text"
+                                              value={newReviewNickname}
+                                              onChange={(e) => setNewReviewNickname(e.target.value.substring(0, 15))}
+                                              onFocus={() => {
+                                                setIsReviewInputFocused(true);
+                                                setTimeout(() => {
+                                                  document.activeElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                }, 150);
+                                              }}
+                                              onBlur={() => setIsReviewInputFocused(false)}
+                                              className="bg-white border border-zinc-200 rounded-xl px-2.5 py-1.5 text-[11px] font-extrabold text-zinc-700 focus:outline-hidden focus:border-orange-400 shadow-2xs"
+                                              placeholder="익명의 사우"
+                                            />
+                                          </div>
+                                          <div className="flex flex-col gap-1 w-3/5">
+                                            <span className="text-[9px] font-black text-zinc-400 tracking-wider">별점</span>
+                                            <span className="text-[11px] font-black text-amber-600 px-1 py-1.5">{newReviewRating}점 만점! ⭐</span>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex flex-col gap-1">
+                                          <span className="text-[9px] font-black text-zinc-400 tracking-wider">후기 내용 (최대 100자)</span>
+                                          <textarea
+                                            value={newReviewComment}
+                                            onChange={(e) => setNewReviewComment(e.target.value.substring(0, 100))}
+                                            onFocus={() => {
+                                              setIsReviewInputFocused(true);
+                                              setTimeout(() => {
+                                                document.activeElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                              }, 150);
+                                            }}
+                                            onBlur={() => setIsReviewInputFocused(false)}
+                                            className="bg-white border border-zinc-200 rounded-xl p-2.5 text-[11px] font-bold text-zinc-700 focus:outline-hidden focus:border-orange-400 shadow-2xs h-16 resize-none"
+                                            placeholder="오늘 식단 어땠나요? 반찬 구성, 간, 맛에 대한 생생한 후기를 남겨주세요."
+                                          />
+                                          <div className="flex items-center justify-between text-[9px] font-bold text-zinc-400 px-1 mt-0.5">
+                                            <span>{newReviewComment.length} / 100자</span>
+                                            <button
+                                              onClick={() => handleReviewSubmit(course.courseName, course.menuDetails)}
+                                              disabled={submittingReview}
+                                              className="px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-900 text-white rounded-lg transition-colors font-black flex items-center gap-1 shadow-xs cursor-pointer disabled:opacity-50"
+                                            >
+                                              {submittingReview ? '등록 중...' : '후기 등록 🚀'}
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* 한줄평 목록 */}
+                                    {expandedReviewCourseName === course.courseName && (
+                                      <div className="bg-slate-50/40 border border-zinc-100 p-3 rounded-2xl flex flex-col gap-2.5 max-h-56 overflow-y-auto overscroll-contain shadow-inner animate-slide-down">
+                                        {loadingReviews ? (
+                                          <div className="text-center py-6 text-zinc-400 font-bold text-[10px] flex items-center justify-center gap-1.5">
+                                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-orange-500" />
+                                            <span>최신 한줄평 불러오는 중...</span>
+                                          </div>
+                                        ) : (
+                                          (() => {
+                                            const reviewsForCourse = courseReviews.filter((r: any) => r.courseName === course.courseName);
+                                            if (reviewsForCourse.length === 0) {
+                                              return (
+                                                <div className="text-center py-6 text-zinc-400 font-extrabold text-[10px] leading-relaxed">
+                                                  📢 아직 오늘 작성된 한줄평 후기가 없습니다.<br />
+                                                  <span className="text-orange-500 font-black">오늘 첫 번째 후기의 주인공이 되어주세요! ✍️</span>
+                                                </div>
+                                              );
+                                            }
+                                            return reviewsForCourse.map((review: any) => (
+                                              <div key={review.id} className="bg-white border border-zinc-100 p-2.5 rounded-xl shadow-2xs flex flex-col gap-1.5 animate-fade-in">
+                                                <div className="flex items-center justify-between gap-2 text-[10px]">
+                                                  <div className="flex items-center gap-1.5">
+                                                    <span className="font-extrabold text-zinc-700">{review.nickname}</span>
+                                                    <span className="text-zinc-300 font-normal">|</span>
+                                                    <div className="flex items-center gap-0.5 text-amber-500 font-black">
+                                                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
+                                                      <span>{review.rating}</span>
+                                                    </div>
+                                                  </div>
+                                                  <span className="text-zinc-400 text-[9px] font-medium">
+                                                    {new Date(review.createdAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                                                  </span>
+                                                </div>
+                                                <p className="text-[11px] font-bold text-zinc-600 leading-relaxed pl-1.5 border-l-2 border-orange-200">
+                                                  {review.comment}
+                                                </p>
+                                              </div>
+                                            ));
+                                          })()
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+
                           const caloriePercentage = Math.min(100, Math.max(10, (course.calories / 1200) * 100));
                           const calorieColorClass = course.calories < 600 
                             ? 'bg-emerald-500' 
                             : course.calories < 850 
                               ? 'bg-orange-500' 
                               : 'bg-rose-500';
+
+                          if (isCompactView) {
+                            return (
+                              <div 
+                                key={idx} 
+                                className="relative bg-white border border-zinc-200 hover:border-orange-300 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between gap-3 overflow-hidden group"
+                              >
+                                <div className={`absolute top-0 bottom-0 left-0 w-1.5 bg-gradient-to-b ${badgeGradient}`} />
+
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pl-2">
+                                  <div className="flex items-center gap-3 flex-grow min-w-0">
+                                    {/* 썸네일 이미지 (콤팩트 미니) */}
+                                    <div className="w-12 h-12 rounded-xl overflow-hidden bg-zinc-100 border border-zinc-100 shrink-0 shadow-inner">
+                                      <img 
+                                        src={getCourseImage(course.courseName, course.imageUrl)} 
+                                        alt={course.courseName} 
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                          e.currentTarget.src = getCourseImage(course.courseName);
+                                        }}
+                                      />
+                                    </div>
+
+                                    <div className="flex flex-col gap-1 min-w-0 flex-grow">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className={`text-[9px] font-black text-white bg-gradient-to-r ${badgeGradient} px-2 py-0.5 rounded-md`}>
+                                          {courseEmoji} {course.courseName}
+                                        </span>
+                                        {course.price && (
+                                          <span className="text-[9px] font-bold text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded-md font-mono">
+                                            💰 {course.price}
+                                          </span>
+                                        )}
+                                        {course.calories > 0 && (
+                                          <span className="text-[9px] font-bold text-zinc-400">
+                                            🔥 {course.calories} kcal
+                                          </span>
+                                        )}
+                                      </div>
+                                      <h4 className="text-xs sm:text-sm font-black text-zinc-800 truncate" title={mainDish}>
+                                        {mainDish}
+                                      </h4>
+                                      {sideDishes.length > 0 && (
+                                        <p className="text-[10px] text-zinc-400 font-medium truncate" title={sideDishes.join(', ')}>
+                                          🥗 {sideDishes.join(', ')}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* 별점 및 리뷰 액션 */}
+                                  <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0 pl-15 sm:pl-0 select-none">
+                                    <button
+                                      onClick={() => {
+                                        const isOpen = expandedReviewCourseName === course.courseName;
+                                        setExpandedReviewCourseName(isOpen ? null : course.courseName);
+                                        if (!isOpen) {
+                                          fetchCourseReviews(menuDetailCafeteriaName, menuDetailDate);
+                                        }
+                                      }}
+                                      className="text-[10px] font-black text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/40 px-2.5 py-1.5 rounded-xl flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                                    >
+                                      <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
+                                      <span>{reviewStats[course.courseName]?.averageRating || '0.0'}</span>
+                                      <span className="text-zinc-400 font-normal">({reviewStats[course.courseName]?.reviewCount || 0})</span>
+                                    </button>
+                                    
+                                    {!submittedReviewCourses[`${menuDetailCafeteriaName}-${menuDetailDate}-${course.courseName}`] ? (
+                                      <button
+                                        onClick={() => {
+                                          if (activeReviewWriteCourseName === course.courseName) {
+                                            setActiveReviewWriteCourseName(null);
+                                            setIsReviewInputFocused(false);
+                                          } else {
+                                            handleOpenReviewWrite(course.courseName);
+                                          }
+                                        }}
+                                        className="text-[10px] font-black text-white bg-orange-500 hover:bg-orange-600 px-3 py-1.5 rounded-xl flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
+                                      >
+                                        ✍️ 후기
+                                      </button>
+                                    ) : (
+                                      <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-xl">
+                                        👍 완료
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* 콤팩트 아코디언 후기 보기/작성 영역 */}
+                                {(expandedReviewCourseName === course.courseName || activeReviewWriteCourseName === course.courseName) && (
+                                  <div className="border-t border-zinc-100 pt-3 flex flex-col gap-3 animate-slide-down">
+                                    {/* 후기 작성 폼 */}
+                                    {activeReviewWriteCourseName === course.courseName && (
+                                      <div className="bg-slate-50/70 border border-zinc-200/60 p-4 rounded-2xl flex flex-col gap-3.5 shadow-inner">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <span className="text-[10px] font-black text-zinc-700">✍️ 오늘의 식단 한줄평</span>
+                                          <div className="flex items-center gap-1">
+                                            {[1, 2, 3, 4, 5].map((num) => (
+                                              <button
+                                                key={num}
+                                                type="button"
+                                                onClick={() => setNewReviewRating(num)}
+                                                className="focus:outline-hidden cursor-pointer p-0.5"
+                                              >
+                                                <Star
+                                                  className={`w-4 h-4 transition-colors ${
+                                                    num <= newReviewRating ? 'fill-amber-400 text-amber-400' : 'text-zinc-300'
+                                                  }`}
+                                                />
+                                              </button>
+                                            ))}
+                                          </div>
+                                        </div>
+
+                                        <div className="flex gap-2">
+                                          <div className="flex flex-col gap-1 w-2/5">
+                                            <span className="text-[9px] font-black text-zinc-400 tracking-wider">닉네임</span>
+                                            <input
+                                              type="text"
+                                              value={newReviewNickname}
+                                              onChange={(e) => setNewReviewNickname(e.target.value.substring(0, 15))}
+                                              onFocus={() => {
+                                                setIsReviewInputFocused(true);
+                                                setTimeout(() => {
+                                                  document.activeElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                }, 150);
+                                              }}
+                                              onBlur={() => setIsReviewInputFocused(false)}
+                                              className="bg-white border border-zinc-200 rounded-xl px-2.5 py-1.5 text-[11px] font-extrabold text-zinc-700 focus:outline-hidden focus:border-orange-400 shadow-2xs"
+                                              placeholder="익명의 사우"
+                                            />
+                                          </div>
+                                          <div className="flex flex-col gap-1 w-3/5">
+                                            <span className="text-[9px] font-black text-zinc-400 tracking-wider">별점</span>
+                                            <span className="text-[11px] font-black text-amber-600 px-1 py-1.5">{newReviewRating}점 만점! ⭐</span>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex flex-col gap-1">
+                                          <span className="text-[9px] font-black text-zinc-400 tracking-wider">후기 내용 (최대 100자)</span>
+                                          <textarea
+                                            value={newReviewComment}
+                                            onChange={(e) => setNewReviewComment(e.target.value.substring(0, 100))}
+                                            onFocus={() => {
+                                              setIsReviewInputFocused(true);
+                                              setTimeout(() => {
+                                                document.activeElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                              }, 150);
+                                            }}
+                                            onBlur={() => setIsReviewInputFocused(false)}
+                                            className="bg-white border border-zinc-200 rounded-xl p-2.5 text-[11px] font-bold text-zinc-700 focus:outline-hidden focus:border-orange-400 shadow-2xs h-16 resize-none"
+                                            placeholder="오늘 식단 어땠나요? 반찬 구성, 간, 맛에 대한 생생한 후기를 남겨주세요."
+                                          />
+                                          <div className="flex items-center justify-between text-[9px] font-bold text-zinc-400 px-1 mt-0.5">
+                                            <span>{newReviewComment.length} / 100자</span>
+                                            <button
+                                              onClick={() => handleReviewSubmit(course.courseName, course.menuDetails)}
+                                              disabled={submittingReview}
+                                              className="px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-900 text-white rounded-lg transition-colors font-black flex items-center gap-1 shadow-xs cursor-pointer disabled:opacity-50"
+                                            >
+                                              {submittingReview ? '등록 중...' : '후기 등록 🚀'}
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* 한줄평 목록 */}
+                                    {expandedReviewCourseName === course.courseName && (
+                                      <div className="bg-slate-50/40 border border-zinc-100 p-3 rounded-2xl flex flex-col gap-2.5 max-h-56 overflow-y-auto overscroll-contain shadow-inner animate-slide-down">
+                                        {loadingReviews ? (
+                                          <div className="text-center py-6 text-zinc-400 font-bold text-[10px] flex items-center justify-center gap-1.5">
+                                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-orange-500" />
+                                            <span>최신 한줄평 불러오는 중...</span>
+                                          </div>
+                                        ) : (
+                                          (() => {
+                                            const reviewsForCourse = courseReviews.filter((r: any) => r.courseName === course.courseName);
+                                            if (reviewsForCourse.length === 0) {
+                                              return (
+                                                <div className="text-center py-6 text-zinc-400 font-extrabold text-[10px] leading-relaxed">
+                                                  📢 아직 오늘 작성된 한줄평 후기가 없습니다.<br />
+                                                  <span className="text-orange-500 font-black">오늘 첫 번째 후기의 주인공이 되어주세요! ✍️</span>
+                                                </div>
+                                              );
+                                            }
+                                            return reviewsForCourse.map((review: any) => (
+                                              <div key={review.id} className="bg-white border border-zinc-100 p-2.5 rounded-xl shadow-2xs flex flex-col gap-1.5 animate-fade-in">
+                                                <div className="flex items-center justify-between gap-2 text-[10px]">
+                                                  <div className="flex items-center gap-1.5">
+                                                    <span className="font-extrabold text-zinc-700">{review.nickname}</span>
+                                                    <span className="text-zinc-300 font-normal">|</span>
+                                                    <div className="flex items-center gap-0.5 text-amber-500 font-black">
+                                                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
+                                                      <span>{review.rating}</span>
+                                                    </div>
+                                                  </div>
+                                                  <span className="text-zinc-400 text-[9px] font-medium">
+                                                    {new Date(review.createdAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                                                  </span>
+                                                </div>
+                                                <p className="text-[11px] font-bold text-zinc-600 leading-relaxed pl-1.5 border-l-2 border-orange-200">
+                                                  {review.comment}
+                                                </p>
+                                              </div>
+                                            ));
+                                          })()
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
 
                           return (
                             <div 
