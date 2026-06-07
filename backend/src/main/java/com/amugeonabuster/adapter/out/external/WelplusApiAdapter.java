@@ -21,10 +21,17 @@ import java.util.*;
 @Component
 public class WelplusApiAdapter implements LoadWelstoryMenuPort {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private static String cachedToken = null;
     private static long tokenExpiryTime = 0;
     private static final String DEVICE_ID = UUID.randomUUID().toString();
+
+    public WelplusApiAdapter() {
+        org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(3000); // 3 seconds
+        factory.setReadTimeout(5000);    // 5 seconds
+        this.restTemplate = new RestTemplate(factory);
+    }
 
     @Override
     public WelstoryMenuResult loadTodayMenu(String cotNo, String hallNo, String cafeteriaName) {
@@ -47,7 +54,7 @@ public class WelplusApiAdapter implements LoadWelstoryMenuPort {
 
             // 1(아침), 2(점심), 3(저녁), 4(야식) 식단을 순회하며 수집
             for (int mealType = 1; mealType <= 4; mealType++) {
-                List<CourseMenu> mealTypeMenus = fetchMenusForMealType(restaurantCode, yyyyMMdd, String.valueOf(mealType), token);
+                List<CourseMenu> mealTypeMenus = fetchMenusForMealType(restaurantCode, yyyyMMdd, String.valueOf(mealType));
                 if (mealTypeMenus != null) {
                     courses.addAll(mealTypeMenus);
                 }
@@ -150,139 +157,152 @@ public class WelplusApiAdapter implements LoadWelstoryMenuPort {
         return "REST000039";
     }
 
-    private List<CourseMenu> fetchMenusForMealType(String restaurantCode, String dateStr, String mealTimeId, String token) {
+    private List<CourseMenu> fetchMenusForMealType(String restaurantCode, String dateStr, String mealTimeId) {
+        String token = getOrFetchToken();
+        if (token == null) {
+            log.error("Cannot fetch menu for meal type {} because no token is available.", mealTimeId);
+            return null;
+        }
+
         try {
-            String url = String.format("https://welplus.welstory.com/api/meal?menuDt=%s&menuMealType=%s&restaurantCode=%s",
-                    dateStr, mealTimeId, restaurantCode);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("User-Agent", "Welplus");
-            headers.set("X-Device-Id", DEVICE_ID);
-            headers.set("Authorization", token);
-
-            HttpEntity<Void> request = new HttpEntity<>(headers);
-
-            ResponseEntity<String> response;
-            try {
-                response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
-            } catch (org.springframework.web.client.HttpClientErrorException e) {
-                if (e.getStatusCode() == org.springframework.http.HttpStatus.UNAUTHORIZED || e.getStatusCode() == org.springframework.http.HttpStatus.FORBIDDEN) {
-                    log.warn("Token expired or unauthorized (Status: {}). Retrying with forced login.", e.getStatusCode());
-                    String newToken = getValidToken(true);
-                    if (newToken != null) {
-                        headers.set("Authorization", newToken);
-                        request = new HttpEntity<>(headers);
-                        response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
-                    } else {
-                        throw e;
-                    }
-                } else {
-                    throw e;
-                }
-            }
-
-            if (!response.getStatusCode().is2xxSuccessful()) {
-                log.error("Failed to fetch menu from Welplus API. Status: {}", response.getStatusCode());
-                return null;
-            }
-
-            String body = response.getBody();
-            if (body == null || body.trim().isEmpty()) {
-                return null;
-            }
-
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode rootNode = mapper.readTree(body);
-
-            if (!rootNode.has("data") || rootNode.get("data").isNull()) {
-                return null;
-            }
-
-            JsonNode dataNode = rootNode.get("data");
-            if (!dataNode.has("mealList") || !dataNode.get("mealList").isArray()) {
-                return null;
-            }
-
-            JsonNode mealList = dataNode.get("mealList");
-            List<CourseMenu> menus = new ArrayList<>();
-            Set<String> uniqueKeys = new HashSet<>();
-
-            for (JsonNode item : mealList) {
-                String courseTxt = item.has("courseTxt") ? item.get("courseTxt").asText().trim() : "";
-                String menuName = item.has("menuName") ? item.get("menuName").asText().trim() : "";
-                String subMenuTxt = item.has("subMenuTxt") ? item.get("subMenuTxt").asText().trim() : "";
-                String menuNameEng = (item.has("menuNameEng") && !item.get("menuNameEng").isNull()) ? item.get("menuNameEng").asText().trim() : "";
-
-                if (menuName.isEmpty() || menuName.contains("주말메뉴안내") || menuName.contains("테이크아웃")) {
-                    continue;
-                }
-
-                String timeLabel = "점심";
-                if ("1".equals(mealTimeId)) timeLabel = "아침";
-                else if ("3".equals(mealTimeId)) timeLabel = "저녁";
-                else if ("4".equals(mealTimeId)) timeLabel = "야식";
-
-                String courseName = courseTxt;
-                if (courseName.isEmpty()) {
-                    courseName = "오늘의 코스";
-                }
-
-                if (!menuNameEng.isEmpty()) {
-                    courseName = String.format("%s (%s) [%s]", courseName, timeLabel, menuNameEng);
-                } else {
-                    courseName = String.format("%s (%s)", courseName, timeLabel);
-                }
-
-                String menuDetails = subMenuTxt;
-                if (menuDetails.isEmpty()) {
-                    menuDetails = menuName;
-                }
-
-                String uniqueKey = courseName + "||" + menuDetails;
-                if (uniqueKeys.contains(uniqueKey)) {
-                    continue;
-                }
-                uniqueKeys.add(uniqueKey);
-
-                int calories = 0;
-                if (item.has("sumKcal") && !item.get("sumKcal").isNull() && !item.get("sumKcal").asText().trim().isEmpty()) {
-                    try {
-                        calories = Integer.parseInt(item.get("sumKcal").asText().replaceAll("[^0-9]", ""));
-                    } catch (Exception e) {}
-                }
-                if (calories == 0 && item.has("kcal") && !item.get("kcal").isNull()) {
-                    try {
-                        calories = Integer.parseInt(item.get("kcal").asText().replaceAll("[^0-9]", ""));
-                    } catch (Exception e) {}
-                }
-
-                String photoCd = item.has("photoCd") ? item.get("photoCd").asText().trim() : "";
-                String photoUrl = item.has("photoUrl") ? item.get("photoUrl").asText().trim() : "";
-                String imageUrl = "";
-                if (!photoCd.isEmpty() && !photoUrl.isEmpty()) {
-                    imageUrl = photoUrl + photoCd;
-                    if (imageUrl.startsWith("http://samsungwelstory.com")) {
-                        imageUrl = imageUrl.replace("http://", "https://");
-                    }
-                }
-
-                String price = "7,840원";
-
-                menus.add(CourseMenu.builder()
-                        .courseName(courseName)
-                        .menuDetails(menuDetails)
-                        .calories(calories)
-                        .price(price)
-                        .imageUrl(imageUrl)
-                        .build());
-            }
-
-            return menus;
-
+            return executeFetchMenus(restaurantCode, dateStr, mealTimeId, token, false);
         } catch (Exception e) {
             log.error("Failed to fetch/parse menu for meal type {}: {}", mealTimeId, e.getMessage(), e);
         }
         return null;
+    }
+
+    private List<CourseMenu> executeFetchMenus(String restaurantCode, String dateStr, String mealTimeId, String token, boolean isRetry) throws Exception {
+        String url = String.format("https://welplus.welstory.com/api/meal?menuDt=%s&menuMealType=%s&restaurantCode=%s",
+                dateStr, mealTimeId, restaurantCode);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("User-Agent", "Welplus");
+        headers.set("X-Device-Id", DEVICE_ID);
+        headers.set("Authorization", token);
+
+        HttpEntity<Void> request = new HttpEntity<>(headers);
+        ResponseEntity<String> response;
+
+        try {
+            response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            if ((e.getStatusCode() == org.springframework.http.HttpStatus.UNAUTHORIZED || e.getStatusCode() == org.springframework.http.HttpStatus.FORBIDDEN) && !isRetry) {
+                log.warn("Token unauthorized (Status: {}). Retrying with forced login refresh.", e.getStatusCode());
+                String newToken = getValidToken(true);
+                if (newToken != null) {
+                    return executeFetchMenus(restaurantCode, dateStr, mealTimeId, newToken, true);
+                }
+            }
+            throw e;
+        }
+
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            log.error("Failed to fetch menu from Welplus API. Status: {}", response.getStatusCode());
+            return null;
+        }
+
+        String body = response.getBody();
+        // ★ 웰스토리 API 특이 현상: 토큰이 만료되면 401 대신 200 OK와 함께 빈 body(empty string)를 반환함
+        if (body == null || body.trim().isEmpty()) {
+            if (!isRetry) {
+                log.warn("Received empty response body for meal type {}. Token might be expired (200 OK Empty Body). Retrying with forced login refresh.", mealTimeId);
+                String newToken = getValidToken(true);
+                if (newToken != null) {
+                    return executeFetchMenus(restaurantCode, dateStr, mealTimeId, newToken, true);
+                }
+            }
+            log.error("Received empty response body for meal type {} even after token refresh.", mealTimeId);
+            return null;
+        }
+
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode rootNode = mapper.readTree(body);
+
+        if (!rootNode.has("data") || rootNode.get("data").isNull()) {
+            return null;
+        }
+
+        JsonNode dataNode = rootNode.get("data");
+        if (!dataNode.has("mealList") || !dataNode.get("mealList").isArray()) {
+            return null;
+        }
+
+        JsonNode mealList = dataNode.get("mealList");
+        List<CourseMenu> menus = new ArrayList<>();
+        Set<String> uniqueKeys = new HashSet<>();
+
+        for (JsonNode item : mealList) {
+            String courseTxt = item.has("courseTxt") ? item.get("courseTxt").asText().trim() : "";
+            String menuName = item.has("menuName") ? item.get("menuName").asText().trim() : "";
+            String subMenuTxt = item.has("subMenuTxt") ? item.get("subMenuTxt").asText().trim() : "";
+            String menuNameEng = (item.has("menuNameEng") && !item.get("menuNameEng").isNull()) ? item.get("menuNameEng").asText().trim() : "";
+
+            if (menuName.isEmpty() || menuName.contains("주말메뉴안내") || menuName.contains("테이크아웃")) {
+                continue;
+            }
+
+            String timeLabel = "점심";
+            if ("1".equals(mealTimeId)) timeLabel = "아침";
+            else if ("3".equals(mealTimeId)) timeLabel = "저녁";
+            else if ("4".equals(mealTimeId)) timeLabel = "야식";
+
+            String courseName = courseTxt;
+            if (courseName.isEmpty()) {
+                courseName = "오늘의 코스";
+            }
+
+            if (!menuNameEng.isEmpty()) {
+                courseName = String.format("%s (%s) [%s]", courseName, timeLabel, menuNameEng);
+            } else {
+                courseName = String.format("%s (%s)", courseName, timeLabel);
+            }
+
+            String menuDetails = subMenuTxt;
+            if (menuDetails.isEmpty()) {
+                menuDetails = menuName;
+            }
+
+            String uniqueKey = courseName + "||" + menuDetails;
+            if (uniqueKeys.contains(uniqueKey)) {
+                continue;
+            }
+            uniqueKeys.add(uniqueKey);
+
+            int calories = 0;
+            if (item.has("sumKcal") && !item.get("sumKcal").isNull() && !item.get("sumKcal").asText().trim().isEmpty()) {
+                try {
+                    calories = Integer.parseInt(item.get("sumKcal").asText().replaceAll("[^0-9]", ""));
+                } catch (Exception e) {}
+            }
+            if (calories == 0 && item.has("kcal") && !item.get("kcal").isNull()) {
+                try {
+                    calories = Integer.parseInt(item.get("kcal").asText().replaceAll("[^0-9]", ""));
+                } catch (Exception e) {}
+            }
+
+            String photoCd = item.has("photoCd") ? item.get("photoCd").asText().trim() : "";
+            String photoUrl = item.has("photoUrl") ? item.get("photoUrl").asText().trim() : "";
+            String imageUrl = "";
+            if (!photoCd.isEmpty() && !photoUrl.isEmpty()) {
+                imageUrl = photoUrl + photoCd;
+                if (imageUrl.startsWith("http://samsungwelstory.com")) {
+                    imageUrl = imageUrl.replace("http://", "https://");
+                }
+            }
+
+            String price = "7,840원";
+
+            menus.add(CourseMenu.builder()
+                    .courseName(courseName)
+                    .menuDetails(menuDetails)
+                    .calories(calories)
+                    .price(price)
+                    .imageUrl(imageUrl)
+                    .build());
+        }
+
+        return menus;
     }
 
     private WelstoryMenuResult generatePremiumFallbackMenu(LocalDate date, String cafeteriaName) {
