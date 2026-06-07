@@ -43,7 +43,9 @@ public class WelplusApiAdapter implements LoadWelstoryMenuPort {
         log.info("Attempting to fetch Welstory menu using direct Welplus API for cafeteria: {}", cafeteriaName);
 
         try {
-            String token = getValidToken(false);
+            // 웰스토리 API는 토큰 만료 시 401이 아닌 200 OK + 빈 body를 반환하므로,
+            // 캐시 유효 시간에 의존하지 않고 매번 새 토큰을 발급받아 사용
+            String token = getValidToken(true);
             if (token == null) {
                 log.warn("Could not obtain valid Welstory token. Utilizing premium fallback menu.");
                 return generatePremiumFallbackMenu(today, cafeteriaName);
@@ -79,6 +81,7 @@ public class WelplusApiAdapter implements LoadWelstoryMenuPort {
     }
 
     private synchronized String getOrFetchToken() {
+
         if (cachedToken != null && System.currentTimeMillis() < tokenExpiryTime) {
             return cachedToken;
         }
