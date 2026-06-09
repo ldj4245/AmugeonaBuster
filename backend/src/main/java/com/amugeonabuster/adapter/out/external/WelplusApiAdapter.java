@@ -14,6 +14,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.TextStyle;
 import java.util.*;
 
@@ -35,7 +36,8 @@ public class WelplusApiAdapter implements LoadWelstoryMenuPort {
 
     @Override
     public WelstoryMenuResult loadTodayMenu(String cotNo, String hallNo, String cafeteriaName) {
-        LocalDate today = LocalDate.now();
+        // Heroku 서버는 UTC 기준으로 동작하므로, KST 기준 날짜를 명시적으로 지정
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
         String dayKorean = today.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.KOREAN);
         String dateHeader = String.format("%d월 %d일 (%s)", today.getMonthValue(), today.getDayOfMonth(), dayKorean);
         String yyyyMMdd = today.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
