@@ -15,7 +15,9 @@ public class WelstoryAlertSettings {
     private Long id;
     private String kakaoId;
     private String nickname;
+    @ToString.Exclude
     private String kakaoAccessToken;
+    @ToString.Exclude
     private String kakaoRefreshToken;
     private String cotNo;
     private String hallNo;

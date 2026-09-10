@@ -4,230 +4,169 @@ import com.amugeonabuster.application.port.in.GetTodayMenuQuery;
 import com.amugeonabuster.application.port.in.GetWelstoryAlertQuery;
 import com.amugeonabuster.application.port.in.KakaoAuthCommand;
 import com.amugeonabuster.application.port.in.SaveWelstoryAlertCommand;
-import com.amugeonabuster.application.port.out.KakaoApiPort.KakaoOAuthResponse;
-import com.amugeonabuster.application.port.out.KakaoApiPort.KakaoUserMeResponse;
 import com.amugeonabuster.domain.model.WelstoryAlertSettings;
 import com.amugeonabuster.domain.model.WelstoryMenuResult;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.Builder;
-import lombok.Data;
-import lombok.extern.slf4j.Slf4j;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/welstory")
-@Slf4j
 public class WelstoryAlertController {
-
-    private final GetWelstoryAlertQuery getWelstoryAlertQuery;
-    private final SaveWelstoryAlertCommand saveWelstoryAlertCommand;
+    private final GetWelstoryAlertQuery query;
+    private final SaveWelstoryAlertCommand command;
     private final GetTodayMenuQuery menuQuery;
-    private final KakaoAuthCommand kakaoAuthCommand;
+    private final KakaoAuthCommand auth;
     private final String restKey;
+    private final String publicUrl;
+    private static final String USER = "welstoryUser";
+    private static final String STATE = "kakaoState";
+    private static final String REDIRECT = "kakaoRedirect";
 
-    public WelstoryAlertController(
-            GetWelstoryAlertQuery getWelstoryAlertQuery,
-            SaveWelstoryAlertCommand saveWelstoryAlertCommand,
-            GetTodayMenuQuery menuQuery,
-            KakaoAuthCommand kakaoAuthCommand,
-            @Value("${kakao.api.rest-key}") String restKey
-    ) {
-        this.getWelstoryAlertQuery = getWelstoryAlertQuery;
-        this.saveWelstoryAlertCommand = saveWelstoryAlertCommand;
+    public WelstoryAlertController(GetWelstoryAlertQuery query, SaveWelstoryAlertCommand command,
+            GetTodayMenuQuery menuQuery, KakaoAuthCommand auth,
+            @Value("${kakao.api.rest-key}") String restKey,
+            @Value("${app.public-url:https://amugeona-buster-6eda848df67d.herokuapp.com}") String publicUrl) {
+        this.query = query;
+        this.command = command;
         this.menuQuery = menuQuery;
-        this.kakaoAuthCommand = kakaoAuthCommand;
+        this.auth = auth;
         this.restKey = restKey;
+        this.publicUrl = publicUrl;
     }
 
-    @Data
-    public static class SaveSettingsRequest {
-        private String kakaoId;
-        private String nickname;
-        private String kakaoAccessToken;
-        private String kakaoRefreshToken;
-        private String cotNo;
-        private String hallNo;
-        private String cafeteriaName;
-        private String scheduledDays;
-        private String scheduledTime;
-        
-        @JsonProperty("isEnabled")
-        private boolean isEnabled;
+    public record SettingsResponse(String nickname, String cotNo, String hallNo, String cafeteriaName,
+            String scheduledDays, String scheduledTime, boolean enabled) {
+        static SettingsResponse from(WelstoryAlertSettings settings) {
+            return new SettingsResponse(settings.getNickname(), settings.getCotNo(), settings.getHallNo(),
+                    settings.getCafeteriaName(), settings.getScheduledDays(), settings.getScheduledTime(), settings.isEnabled());
+        }
     }
+    public record SaveSettingsRequest(String cotNo, String hallNo, String cafeteriaName,
+            String scheduledDays, String scheduledTime, boolean isEnabled) {}
+    public record TokenExchangeRequest(String code, String state, String redirectUri) {}
+    public record CafeteriaPreset(String name, String cotNo, String hallNo) {}
 
-    @Data
-    public static class TokenExchangeRequest {
-        private String code;
-        private String redirectUri;
-    }
-
-    @Data
-    @Builder
-    public static class CafeteriaPreset {
-        private String name;
-        private String cotNo;
-        private String hallNo;
+    private WelstoryAlertSettings current(HttpSession session) {
+        Object id = session.getAttribute(USER);
+        if (!(id instanceof String)) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "카카오 연결이 필요합니다.");
+        return query.getSettings((String) id).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
     }
 
     @GetMapping("/auth-url")
-    public ResponseEntity<Map<String, String>> getAuthUrl(@RequestParam("redirectUri") String redirectUri) {
-        log.info("Generating Kakao OAuth Auth URL. RedirectUri: {}", redirectUri);
-        String url = "https://kauth.kakao.com/oauth/authorize"
-            + "?client_id=" + restKey
-            + "&redirect_uri=" + redirectUri
-            + "&response_type=code"
-            + "&scope=talk_message";
-        Map<String, String> response = new HashMap<>();
-        response.put("url", url);
-        return ResponseEntity.ok(response);
+    public Map<String, String> authUrl(@RequestParam("redirectUri") String redirectUri, HttpSession session) {
+        if (restKey.isBlank()) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "카카오 연결을 준비 중이에요. 잠시 후 다시 시도해 주세요.");
+        if (!List.of(publicUrl, "http://localhost:5173", "http://localhost:8080", "http://127.0.0.1:5173").contains(redirectUri)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "허용되지 않는 연결 주소입니다.");
+        }
+        String state = UUID.randomUUID().toString();
+        session.setAttribute(STATE, state);
+        session.setAttribute(REDIRECT, redirectUri);
+        return Map.of("url", "https://kauth.kakao.com/oauth/authorize?client_id=" + restKey
+                + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
+                + "&response_type=code&scope=talk_message&state=" + state);
     }
 
     @PostMapping("/token-exchange")
-    public ResponseEntity<WelstoryAlertSettings> tokenExchange(@RequestBody TokenExchangeRequest request) {
-        log.info("Performing Kakao token exchange for code: {}", request.getCode());
-        try {
-            KakaoOAuthResponse tokens = kakaoAuthCommand.getOAuthTokens(request.getCode(), request.getRedirectUri());
-            KakaoUserMeResponse profile = kakaoAuthCommand.getUserMe(tokens.getAccessToken());
-
-            String kakaoId = String.valueOf(profile.getId());
-            String nickname = profile.getNickname();
-
-            WelstoryAlertSettings entity = getWelstoryAlertQuery.getSettings(kakaoId)
-                .orElseGet(() -> WelstoryAlertSettings.builder()
-                    .kakaoId(kakaoId)
-                    .cotNo("WEL_DSR")
-                    .hallNo("HALL_01")
-                    .cafeteriaName("삼성 DSR 타워 웰스토리")
-                    .scheduledDays("1,2,3,4,5")
-                    .scheduledTime("11:30")
-                    .isEnabled(true)
-                    .build());
-
-            entity.setNickname(nickname);
-            entity.setKakaoAccessToken(tokens.getAccessToken());
-            entity.setKakaoRefreshToken(tokens.getRefreshToken());
-
-            WelstoryAlertSettings saved = saveWelstoryAlertCommand.saveSettings(entity);
-            return ResponseEntity.ok(saved);
-        } catch (Exception e) {
-            log.error("Failed to perform token exchange: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    public SettingsResponse exchange(@RequestBody TokenExchangeRequest request, HttpServletRequest servletRequest) {
+        HttpSession session = servletRequest.getSession();
+        if (request.state() == null || !request.state().equals(session.getAttribute(STATE))
+                || !request.redirectUri().equals(session.getAttribute(REDIRECT))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "연결 요청이 만료됐어요. 카카오 연결을 다시 시작해 주세요.");
         }
+        session.removeAttribute(STATE);
+        session.removeAttribute(REDIRECT);
+        var tokens = auth.getOAuthTokens(request.code(), request.redirectUri());
+        var profile = auth.getUserMe(tokens.getAccessToken());
+        String id = String.valueOf(profile.getId());
+        WelstoryAlertSettings settings = query.getSettings(id).orElseGet(() -> WelstoryAlertSettings.builder()
+                .kakaoId(id).cotNo("WEL_DSR").hallNo("HALL_01").cafeteriaName("삼성 DSR 타워 웰스토리")
+                .scheduledDays("1,2,3,4,5").scheduledTime("11:30").isEnabled(true).build());
+        settings.setNickname(profile.getNickname());
+        settings.setKakaoAccessToken(tokens.getAccessToken());
+        if (tokens.getRefreshToken() != null) settings.setKakaoRefreshToken(tokens.getRefreshToken());
+        SettingsResponse response = SettingsResponse.from(command.saveSettings(settings));
+        servletRequest.changeSessionId();
+        session.setAttribute(USER, id);
+        session.setMaxInactiveInterval(60 * 60 * 24 * 7);
+        return response;
     }
 
     @GetMapping("/settings")
-    public ResponseEntity<WelstoryAlertSettings> getSettings(@RequestParam("kakaoId") String kakaoId) {
-        log.info("Viewing Welstory settings for kakaoId: {}", kakaoId);
-        return getWelstoryAlertQuery.getSettings(kakaoId)
-            .map(ResponseEntity::ok)
-            .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
-    }
+    public SettingsResponse settings(HttpSession session) { return SettingsResponse.from(current(session)); }
 
     @PostMapping("/settings")
-    public ResponseEntity<WelstoryAlertSettings> saveSettings(@RequestBody SaveSettingsRequest request) {
-        log.info("Saving Welstory settings for user: {}, kakaoId: {}", request.getNickname(), request.getKakaoId());
-
-        WelstoryAlertSettings entity = getWelstoryAlertQuery.getSettings(request.getKakaoId())
-            .orElseGet(() -> WelstoryAlertSettings.builder().kakaoId(request.getKakaoId()).build());
-
-        entity.setNickname(request.getNickname());
-        entity.setKakaoAccessToken(request.getKakaoAccessToken());
-        entity.setKakaoRefreshToken(request.getKakaoRefreshToken());
-        entity.setCotNo(request.getCotNo());
-        entity.setHallNo(request.getHallNo());
-        entity.setCafeteriaName(request.getCafeteriaName());
-        entity.setScheduledDays(request.getScheduledDays());
-        entity.setScheduledTime(request.getScheduledTime());
-        entity.setEnabled(request.isEnabled());
-
-        WelstoryAlertSettings saved = saveWelstoryAlertCommand.saveSettings(entity);
-        return ResponseEntity.ok(saved);
+    public SettingsResponse save(@RequestBody SaveSettingsRequest request, HttpSession session) {
+        WelstoryAlertSettings settings = current(session);
+        var preset = cafeterias().stream().filter(c -> c.cotNo().equals(request.cotNo()) && c.hallNo().equals(request.hallNo()))
+                .findFirst().orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "식당을 선택해 주세요."));
+        if (request.scheduledDays() == null || !request.scheduledDays().matches("[1-7](,[1-7]){0,6}")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "받을 요일을 선택해 주세요.");
+        }
+        try {
+            if (request.scheduledTime() == null || !request.scheduledTime().matches("\\d{2}:\\d{2}")) throw new IllegalArgumentException();
+            LocalTime.parse(request.scheduledTime());
+        } catch (RuntimeException e) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "알림 시간을 확인해 주세요."); }
+        settings.setCotNo(preset.cotNo()); settings.setHallNo(preset.hallNo()); settings.setCafeteriaName(preset.name());
+        settings.setScheduledDays(request.scheduledDays()); settings.setScheduledTime(request.scheduledTime()); settings.setEnabled(request.isEnabled());
+        return SettingsResponse.from(command.saveSettings(settings));
     }
 
     @PostMapping("/test-send")
-    public ResponseEntity<Map<String, Object>> testSend(@RequestParam("kakaoId") String kakaoId) {
-        log.info("Triggering immediate test Welstory send for kakaoId: {}", kakaoId);
-        Map<String, Object> response = new HashMap<>();
+    public Map<String, Object> test(HttpSession session) throws Exception {
+        WelstoryAlertSettings settings = current(session);
+        Long last = (Long) session.getAttribute("lastTestSend");
+        if (last != null && System.currentTimeMillis() - last < 60000) throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "1분 후 다시 시도해 주세요.");
+        session.setAttribute("lastTestSend", System.currentTimeMillis());
+        if (!command.triggerTestSend(settings.getKakaoId())) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "식단을 보내지 못했어요. 잠시 후 다시 시도해 주세요.");
+        return Map.of("success", true);
+    }
 
-        try {
-            boolean success = saveWelstoryAlertCommand.triggerTestSend(kakaoId);
-            if (success) {
-                response.put("success", true);
-                response.put("message", "성공적으로 테스트 메시지가 카카오톡으로 발송되었습니다! 카톡을 확인해 보세요. 🍱");
-                return ResponseEntity.ok(response);
-            } else {
-                response.put("success", false);
-                response.put("message", "메시지 발송에 실패했습니다. 카카오톡 전송 허용 권한(talk_message)을 동의했는지 확인해 주세요.");
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-            }
-        } catch (IllegalArgumentException e) {
-            response.put("success", false);
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        } catch (Exception e) {
-            log.error("Exception during test send for kakaoId {}: {}", kakaoId, e.getMessage(), e);
-            response.put("success", false);
-            response.put("message", "카카오 로그인 세션이 만료되었거나 오류가 발생했습니다: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(HttpSession session) {
+        WelstoryAlertSettings settings = current(session);
+        settings.setEnabled(false);
+        command.saveSettings(settings);
+        session.invalidate();
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/cafeterias")
-    public ResponseEntity<List<CafeteriaPreset>> getCafeterias() {
-        List<CafeteriaPreset> presets = new ArrayList<>();
-        presets.add(CafeteriaPreset.builder().name("삼성 DSR 타워 웰스토리").cotNo("WEL_DSR").hallNo("HALL_01").build());
-        presets.add(CafeteriaPreset.builder().name("삼성전자 수원디지털시티 R5").cotNo("WEL_SUWON").hallNo("HALL_02").build());
-        presets.add(CafeteriaPreset.builder().name("삼성전자 기흥캠퍼스 MR1").cotNo("WEL_GIHEUNG").hallNo("HALL_03").build());
-        presets.add(CafeteriaPreset.builder().name("삼성전자 화성캠퍼스 D1").cotNo("WEL_HWASEONG").hallNo("HALL_04").build());
-        presets.add(CafeteriaPreset.builder().name("삼성전자 서초사옥 웰스토리").cotNo("WEL_SEOCHO").hallNo("HALL_05").build());
-        presets.add(CafeteriaPreset.builder().name("삼성웰스토리 본사 식당").cotNo("WEL_HQ").hallNo("HALL_06").build());
-        return ResponseEntity.ok(presets);
-    }
-
-    @PostMapping("/reset-last-sent")
-    public ResponseEntity<Map<String, Object>> resetLastSent(@RequestParam(value = "kakaoId", required = false) String kakaoId) {
-        Map<String, Object> response = new HashMap<>();
-        try {
-            if (kakaoId == null || kakaoId.trim().isEmpty()) {
-                log.info("Resetting lastSentDate for all users.");
-                saveWelstoryAlertCommand.resetAllLastSentDates();
-                response.put("message", "전체 사용자의 오늘 자 발송 완료 플래그가 강제 초기화되었습니다! 🔄");
-            } else {
-                log.info("Resetting lastSentDate for kakaoId: {}", kakaoId);
-                saveWelstoryAlertCommand.resetLastSentDate(kakaoId);
-                response.put("message", "해당 사용자의 오늘 자 발송 완료 플래그가 강제 초기화되었습니다! 🔄");
-            }
-            response.put("success", true);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Failed to reset lastSentDate: {}", e.getMessage(), e);
-            response.put("success", false);
-            response.put("message", "초기화 실패: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
+    public List<CafeteriaPreset> cafeterias() {
+        return List.of(new CafeteriaPreset("삼성 DSR 타워 웰스토리", "WEL_DSR", "HALL_01"),
+                new CafeteriaPreset("삼성전자 수원디지털시티 R5", "WEL_SUWON", "HALL_02"),
+                new CafeteriaPreset("삼성전자 기흥캠퍼스 MR1", "WEL_GIHEUNG", "HALL_03"),
+                new CafeteriaPreset("삼성전자 화성캠퍼스 D1", "WEL_HWASEONG", "HALL_04"),
+                new CafeteriaPreset("삼성전자 서초사옥 웰스토리", "WEL_SEOCHO", "HALL_05"),
+                new CafeteriaPreset("삼성웰스토리 본사 식당", "WEL_HQ", "HALL_06"));
     }
 
     @GetMapping("/menu-details")
-    public ResponseEntity<WelstoryMenuResult> getMenuDetails(
-            @RequestParam("cotNo") String cotNo,
-            @RequestParam("hallNo") String hallNo,
-            @RequestParam("cafeteriaName") String cafeteriaName
-    ) {
-        log.info("Viewing real-time Welstory menu details for cotNo: {}, hallNo: {}", cotNo, hallNo);
+    public WelstoryMenuResult menu(@RequestParam("cotNo") String cotNo, @RequestParam("hallNo") String hallNo,
+            @RequestParam(value = "date", required = false) String date) {
+        var preset = cafeterias().stream().filter(c -> c.cotNo().equals(cotNo) && c.hallNo().equals(hallNo))
+                .findFirst().orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "지원하지 않는 식당입니다."));
+        if (date == null) return menuQuery.getTodayMenu(cotNo, hallNo, preset.name());
         try {
-            WelstoryMenuResult menuResult = menuQuery.getTodayMenu(cotNo, hallNo, cafeteriaName);
-            return ResponseEntity.ok(menuResult);
-        } catch (Exception e) {
-            log.error("Failed to fetch Welstory menu details: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return menuQuery.getMenu(cotNo, hallNo, preset.name(), java.time.LocalDate.parse(date));
+        } catch (java.time.format.DateTimeParseException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "날짜 형식이 올바르지 않습니다.");
         }
     }
 }

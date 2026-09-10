@@ -56,18 +56,21 @@ tasks.named('test') {
 task buildFrontend(type: Exec) {
     workingDir '../frontend'
     inputs.dir '../frontend/src'
+    inputs.dir '../frontend/public'
+    inputs.files '../frontend/package.json', '../frontend/package-lock.json', '../frontend/index.html', '../frontend/vite.config.ts', '../frontend/tsconfig.json', '../frontend/tailwind.config.js', '../frontend/postcss.config.js'
     outputs.dir '../frontend/dist'
 
     if (System.getProperty('os.name').toLowerCase().contains('windows')) {
-        commandLine 'cmd', '/c', 'npm install && npm run build'
+        commandLine 'cmd', '/c', 'npm ci && npm run test:games && npm run build'
     } else {
-        commandLine 'sh', '-c', 'npm install && npm run build'
+        commandLine 'sh', '-c', 'npm ci && npm run test:games && npm run build'
     }
 }
 
-task copyFrontendToStatic(type: Copy) {
+task copyFrontendToStatic(type: Sync) {
     dependsOn buildFrontend
     from '../frontend/dist'
+    exclude 'mockup.html'
     into 'src/main/resources/static'
 }
 

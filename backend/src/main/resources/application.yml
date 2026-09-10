@@ -1,5 +1,10 @@
 server:
   port: 8080
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        same-site: lax
 
 spring:
   profiles:
@@ -7,7 +12,7 @@ spring:
 
 kakao:
   api:
-    rest-key: ${KAKAO_REST_API_KEY}
+    rest-key: ${KAKAO_REST_API_KEY:}
 
 ---
 # 💻 로컬 개발 환경 (H2 In-Memory DB)
