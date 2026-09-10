@@ -51,6 +51,10 @@ public class RoomService implements CreateRoomUseCase, GetRoomUseCase, JoinRoomU
                 .id(roomId)
                 .hostId(hostId)
                 .location(command.getLocation())
+                .locationAddress(command.getLocationAddress())
+                .locationPlaceId(command.getLocationPlaceId())
+                .latitude(command.getLatitude())
+                .longitude(command.getLongitude())
                 .customMenus(command.getCustomMenus())
                 .build();
 
@@ -109,10 +113,10 @@ public class RoomService implements CreateRoomUseCase, GetRoomUseCase, JoinRoomU
             room.determineWinningMenu();
 
             // 맛집 추천 아웃고잉 포트 가동 및 바인딩
-            List<Restaurant> recommended = recommendRestaurantsPort.recommend(
-                    room.getWinningMenu(),
-                    room.getLocation()
-            );
+            List<Restaurant> recommended = room.hasLocationCoordinates()
+                    ? recommendRestaurantsPort.recommend(room.getWinningMenu(), room.getLocation(),
+                            room.getLatitude(), room.getLongitude())
+                    : recommendRestaurantsPort.recommend(room.getWinningMenu(), room.getLocation());
             room.associateMatchedRestaurants(recommended);
         }
 

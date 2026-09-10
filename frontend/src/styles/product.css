@@ -1919,3 +1919,39 @@ p {
     max-width: 90px;
   }
 }
+
+/* 모바일에서는 게임 선택 직후의 다음 행동을 화면 하단에 유지한다. */
+@media (max-width: 800px) {
+  .games-content {
+    padding-bottom: calc(82px + env(safe-area-inset-bottom));
+  }
+  .games-content > .game-detail .detail-start {
+    position: fixed;
+    z-index: 50;
+    left: 16px;
+    right: 16px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    width: auto;
+    height: 50px;
+    margin: 0;
+    border: 1px solid #1f2837;
+    border-radius: 10px;
+    box-shadow: 0 10px 26px rgba(31, 40, 55, 0.22);
+  }
+}
+
+/* 작은 화면에서도 첫 카드의 설명 영역이 한 글자씩 끊기지 않도록 고정한다. */
+@media (max-width: 800px) {
+  .game-options .game-option:first-child .tags,
+  .game-options .game-option:first-child h2,
+  .game-options .game-option:first-child p,
+  .game-options .game-option:first-child .option-bottom {
+    grid-column: 1;
+    min-width: 0;
+  }
+  .game-options .game-option:first-child h2,
+  .game-options .game-option:first-child p {
+    overflow-wrap: normal;
+    word-break: keep-all;
+  }
+}

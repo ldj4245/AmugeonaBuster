@@ -49,6 +49,9 @@ public class RoomMapper {
                         .phone(restaurantEntity.getPhone())
                         .category(restaurantEntity.getCategory())
                         .placeUrl(restaurantEntity.getPlaceUrl())
+                        .externalPlaceId(restaurantEntity.getExternalPlaceId())
+                        .distanceMeters(restaurantEntity.getDistanceMeters())
+                        .matchType(restaurantEntity.getMatchType())
                         .build())
                 .collect(Collectors.toList());
 
@@ -67,6 +70,10 @@ public class RoomMapper {
                 .id(jpaEntity.getId())
                 .hostId(jpaEntity.getHostId())
                 .location(jpaEntity.getLocation())
+                .locationAddress(jpaEntity.getLocationAddress())
+                .locationPlaceId(jpaEntity.getLocationPlaceId())
+                .latitude(jpaEntity.getLatitude())
+                .longitude(jpaEntity.getLongitude())
                 .status(jpaEntity.getStatus())
                 .maxSwipeCount(jpaEntity.getMaxSwipeCount())
                 .members(domainMembers)
@@ -95,6 +102,10 @@ public class RoomMapper {
                 .id(domainModel.getId())
                 .hostId(domainModel.getHostId())
                 .location(domainModel.getLocation())
+                .locationAddress(domainModel.getLocationAddress())
+                .locationPlaceId(domainModel.getLocationPlaceId())
+                .latitude(domainModel.getLatitude())
+                .longitude(domainModel.getLongitude())
                 .status(domainModel.getStatus())
                 .maxSwipeCount(domainModel.getMaxSwipeCount())
                 .winningMenu(domainModel.getWinningMenu())
@@ -132,6 +143,9 @@ public class RoomMapper {
                     .phone(domainRestaurant.getPhone())
                     .category(domainRestaurant.getCategory())
                     .placeUrl(domainRestaurant.getPlaceUrl())
+                    .externalPlaceId(domainRestaurant.getExternalPlaceId())
+                    .distanceMeters(domainRestaurant.getDistanceMeters())
+                    .matchType(domainRestaurant.getMatchType())
                     .build();
             jpaEntity.addRestaurant(restaurantJpaEntity);
         });

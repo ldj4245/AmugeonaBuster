@@ -8,9 +8,12 @@ import {
   X,
   ExternalLink,
   RefreshCw,
+  LocateFixed,
+  Search,
 } from "lucide-react";
 import { api, errorText, post, readLocal, saveLocal } from "../../lib/api";
 import { useWebSocket, WebSocketRoomResponse } from "../../hooks/useWebSocket";
+import { KakaoMap } from "../../components/KakaoMap";
 const menus = [
   "삼겹살",
   "김치찌개",
@@ -29,6 +32,15 @@ const menus = [
   "팟타이",
 ];
 type Room = WebSocketRoomResponse;
+const formatDistance = (meters: number) =>
+  meters < 1000 ? `${meters}m` : `${(meters / 1000).toFixed(1)}km`;
+interface LocationCandidate {
+  placeId: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+}
 export const RoomPage = (): React.JSX.Element => {
   const [room, setRoom] = useState<Room | null>(null);
   const [member, setMember] = useState("");
@@ -36,6 +48,14 @@ export const RoomPage = (): React.JSX.Element => {
   const [location, setLocation] = useState(
     () => new URLSearchParams(window.location.search).get("location") || "",
   );
+  const [locationAddress, setLocationAddress] = useState("");
+  const [locationPlaceId, setLocationPlaceId] = useState("");
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [locationSuggestions, setLocationSuggestions] = useState<LocationCandidate[]>([]);
+  const [locationConfirmed, setLocationConfirmed] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationMessage, setLocationMessage] = useState("");
   const [join, setJoin] = useState(() =>
     new URLSearchParams(window.location.search).has("room"),
   );
@@ -62,6 +82,26 @@ export const RoomPage = (): React.JSX.Element => {
       .catch(() => undefined);
     return () => controller.abort();
   }, []);
+  useEffect(() => {
+    if (join || locationConfirmed || location.trim().length < 2) {
+      setLocationSuggestions([]);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      api<LocationCandidate[]>(`/locations/search?${new URLSearchParams({ query: location.trim() })}`, {
+        signal: controller.signal,
+      })
+        .then(setLocationSuggestions)
+        .catch(() => {
+          if (!controller.signal.aborted) setLocationSuggestions([]);
+        });
+    }, 220);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [join, location, locationConfirmed]);
   const perform = async (fn: () => Promise<void>) => {
     setBusy(true);
     setMessage("");
@@ -82,12 +122,67 @@ export const RoomPage = (): React.JSX.Element => {
       : await post<Room>("/rooms", {
           hostNickname: nickname.trim(),
           location: location.trim(),
+          locationAddress: locationAddress.trim() || undefined,
+          locationPlaceId: locationPlaceId || undefined,
+          latitude: latitude ?? undefined,
+          longitude: longitude ?? undefined,
           customMenus: selected,
         });
     const mine = data.members[data.members.length - 1].id;
     setMember(mine);
     setRoom(data);
     setSwiped([]);
+  };
+  const useCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationMessage("이 브라우저에서는 현재 위치를 사용할 수 없습니다. 장소를 검색해 주세요.");
+      return;
+    }
+    setLocationLoading(true);
+    setLocationMessage("");
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        setLatitude(coords.latitude);
+        setLongitude(coords.longitude);
+        setLocationPlaceId("");
+        setLocationConfirmed(true);
+        setLocationSuggestions([]);
+        try {
+          const resolved = await api<LocationCandidate>(
+            `/locations/reverse?${new URLSearchParams({
+              latitude: String(coords.latitude),
+              longitude: String(coords.longitude),
+            })}`,
+          );
+          setLocation(resolved.name || "현재 위치");
+          setLocationAddress(resolved.address || "");
+        } catch {
+          setLocation("현재 위치");
+          setLocationAddress("기기에서 확인한 위치");
+        } finally {
+          setLocationLoading(false);
+        }
+      },
+      (error) => {
+        setLocationLoading(false);
+        setLocationMessage(
+          error.code === error.PERMISSION_DENIED
+            ? "위치 권한이 꺼져 있습니다. 권한을 허용하거나 장소를 검색해 주세요."
+            : "현재 위치를 확인하지 못했습니다. 장소를 검색해 주세요.",
+        );
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+    );
+  };
+  const selectLocation = (candidate: LocationCandidate) => {
+    setLocation(candidate.name);
+    setLocationAddress(candidate.address);
+    setLocationPlaceId(candidate.placeId);
+    setLatitude(candidate.latitude);
+    setLongitude(candidate.longitude);
+    setLocationConfirmed(true);
+    setLocationSuggestions([]);
+    setLocationMessage("");
   };
   const nextMenu = room?.defaultMenus.find((menu) => !swiped.includes(menu));
   const vote = async (like: boolean) => {
@@ -164,16 +259,60 @@ export const RoomPage = (): React.JSX.Element => {
               </label>
             ) : (
               <>
-                <label className="field-label">
-                  위치
-                  <input
-                    required
-                    maxLength={80}
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    placeholder="예: 강남역, 수원디지털시티"
-                  />
-                </label>
+                <div className="field-label location-field" role="group" aria-labelledby="location-label">
+                  <span id="location-label">약속 위치</span>
+                  <div className="location-input-row">
+                    <div className="location-input-wrap">
+                      <Search size={16} aria-hidden="true" />
+                      <input
+                        required
+                        maxLength={80}
+                        value={location}
+                        onChange={(e) => {
+                          setLocation(e.target.value);
+                          setLocationAddress("");
+                          setLocationPlaceId("");
+                          setLatitude(null);
+                          setLongitude(null);
+                          setLocationConfirmed(false);
+                          setLocationMessage("");
+                        }}
+                        placeholder="역, 건물, 주소로 검색"
+                        autoComplete="off"
+                        aria-label="약속 위치 검색"
+                        aria-autocomplete="list"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="location-current-button"
+                      onClick={useCurrentLocation}
+                      disabled={locationLoading}
+                    >
+                      <LocateFixed size={15} />
+                      {locationLoading ? "확인 중" : "현재 위치"}
+                    </button>
+                  </div>
+                  {locationSuggestions.length > 0 && (
+                    <div className="location-suggestions" role="listbox" aria-label="위치 검색 결과">
+                      {locationSuggestions.map((candidate) => (
+                        <button
+                          type="button"
+                          role="option"
+                          key={`${candidate.placeId}-${candidate.latitude}`}
+                          onClick={() => selectLocation(candidate)}
+                        >
+                          <strong>{candidate.name}</strong>
+                          <span>{candidate.address || "주소 정보 없음"}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {locationConfirmed && locationAddress && (
+                    <p className="location-confirmed">{locationAddress}</p>
+                  )}
+                  {locationMessage && <p className="location-message">{locationMessage}</p>}
+                </div>
                 <label className="field-label">
                   후보 메뉴 · {selected.length}개
                 </label>
@@ -226,6 +365,7 @@ export const RoomPage = (): React.JSX.Element => {
               className="button primary wide"
               disabled={
                 busy ||
+                locationLoading ||
                 !nickname.trim() ||
                 (!join && (!location.trim() || !selected.length))
               }
@@ -242,6 +382,7 @@ export const RoomPage = (): React.JSX.Element => {
               <MapPin size={17} />
               {room.location}
             </span>
+            {room.locationAddress && <small>{room.locationAddress}</small>}
             <span>{room.members.length}명 참여 중</span>
             <button
               className="text-button"
@@ -373,6 +514,19 @@ export const RoomPage = (): React.JSX.Element => {
                 오늘은 <em>{room.winningMenu}</em>
               </h2>
               <p>참여자 투표를 합산한 결과입니다.</p>
+              {room.locationAddress && (
+                <p className="match-location">
+                  <MapPin size={14} /> {room.locationAddress} 기준 1km
+                </p>
+              )}
+              {room.matchedRestaurants.length > 0 && (
+                <KakaoMap
+                  matchedRestaurants={room.matchedRestaurants}
+                  location={room.location}
+                  latitude={room.latitude}
+                  longitude={room.longitude}
+                />
+              )}
               <div className="restaurant-list">
                 {room.matchedRestaurants.length ? (
                   room.matchedRestaurants.map((r) => (
@@ -389,6 +543,12 @@ export const RoomPage = (): React.JSX.Element => {
                     >
                       <div>
                         <h3>{r.name}</h3>
+                        <div className="restaurant-meta">
+                          <span>
+                            {r.matchType === "MENU_MATCH" ? `${room.winningMenu} 검색 결과` : "주변 음식점"}
+                          </span>
+                          {r.distanceMeters > 0 && <span>{formatDistance(r.distanceMeters)}</span>}
+                        </div>
                         <p>{r.address}</p>
                       </div>
                       <ExternalLink size={19} />

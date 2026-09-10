@@ -12,6 +12,10 @@ import java.util.List;
 public class CreateRoomRequest {
     private String hostNickname;
     private String location;
+    private String locationAddress;
+    private String locationPlaceId;
+    private Double latitude;
+    private Double longitude;
     private int maxSwipeCount;
     private List<String> customMenus;
 }
