@@ -38,6 +38,10 @@ public class Room {
         this.winningMenu = winningMenu;
         this.matchedRestaurants = matchedRestaurants != null ? new ArrayList<>(matchedRestaurants) : new ArrayList<>();
         if (customMenus != null && !customMenus.isEmpty()) {
+            if (customMenus.size() > 30 || customMenus.stream().anyMatch(m -> m == null || m.isBlank() || m.length() > 30)
+                    || customMenus.stream().distinct().count() != customMenus.size()) {
+                throw new IllegalArgumentException("메뉴는 중복 없이 30자 이하로 최대 30개까지 선택해 주세요.");
+            }
             this.customMenus = new ArrayList<>(customMenus);
             this.maxSwipeCount = this.customMenus.size();
         } else {
@@ -103,6 +107,9 @@ public class Room {
      * 메뉴 스와이프 등록 비즈니스 룰 (멱등성 보장)
      */
     public void swipeMenu(UUID memberId, String menuName, boolean isLike) {
+        if (!this.customMenus.contains(menuName)) {
+            throw new IllegalArgumentException("이 방의 후보 메뉴만 선택할 수 있습니다.");
+        }
         if (this.status != RoomStatus.PLAYING) {
             throw new InvalidRoomStateException("투표가 진행 중인 방에서만 스와이프할 수 있습니다.");
         }

@@ -7,10 +7,13 @@ import com.amugeonabuster.domain.model.Swipe;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.stream.Collectors;
 
 @Component
 public class RoomMapper {
+    private final ObjectMapper json = new ObjectMapper();
 
     /**
      * JPA Entity -> Pure Domain Model 변환
@@ -51,7 +54,13 @@ public class RoomMapper {
 
         List<String> domainCustomMenus = List.of();
         if (jpaEntity.getCustomMenus() != null && !jpaEntity.getCustomMenus().isEmpty()) {
-            domainCustomMenus = List.of(jpaEntity.getCustomMenus().split(","));
+            String savedMenus = jpaEntity.getCustomMenus();
+            if (savedMenus.startsWith("[")) {
+                try { domainCustomMenus = json.readValue(savedMenus, new TypeReference<List<String>>() {}); }
+                catch (Exception e) { throw new IllegalStateException("저장된 메뉴를 읽을 수 없습니다.", e); }
+            } else {
+                domainCustomMenus = List.of(savedMenus.split(","));
+            }
         }
 
         return Room.builder()
@@ -78,7 +87,8 @@ public class RoomMapper {
 
         String customMenusStr = "";
         if (domainModel.getCustomMenus() != null && !domainModel.getCustomMenus().isEmpty()) {
-            customMenusStr = String.join(",", domainModel.getCustomMenus());
+            try { customMenusStr = json.writeValueAsString(domainModel.getCustomMenus()); }
+            catch (Exception e) { throw new IllegalStateException("메뉴를 저장할 수 없습니다.", e); }
         }
 
         RoomJpaEntity jpaEntity = RoomJpaEntity.builder()

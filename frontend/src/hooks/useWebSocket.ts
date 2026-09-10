@@ -39,10 +39,7 @@ export function useWebSocket(
   useEffect(() => {
     if (!roomId) return;
 
-    const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const socketUrl = isLocalDev
-      ? 'http://localhost:8080/ws-connection'
-      : `${window.location.origin}/ws-connection`;
+    const socketUrl = `${window.location.origin}/ws-connection`;
     const client = new Client({
       webSocketFactory: () => new SockJS(socketUrl),
       reconnectDelay: 5000,

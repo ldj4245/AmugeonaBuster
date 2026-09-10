@@ -12,6 +12,9 @@ import com.amugeonabuster.application.port.in.SwipeMenuUseCase;
 import com.amugeonabuster.application.port.in.SwipeMenuUseCase.SwipeMenuCommand;
 import com.amugeonabuster.domain.model.Room;
 import lombok.RequiredArgsConstructor;
+import jakarta.servlet.http.HttpSession;
+import java.util.UUID;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -31,7 +34,7 @@ public class RoomController {
      * 리소스 지향 방 개설 API (POST /api/rooms)
      */
     @PostMapping
-    public ResponseEntity<RoomResponse> createRoom(@RequestBody CreateRoomRequest request) {
+    public ResponseEntity<RoomResponse> createRoom(@RequestBody CreateRoomRequest request, HttpSession session) {
         CreateRoomCommand command = new CreateRoomCommand(
                 request.getHostNickname(),
                 request.getLocation(),
@@ -39,6 +42,7 @@ public class RoomController {
         );
 
         Room room = createRoomUseCase.createRoom(command);
+        session.setAttribute("room:" + room.getId(), room.getHostId());
         RoomResponse response = RoomResponse.fromDomain(room);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -50,7 +54,7 @@ public class RoomController {
     @PostMapping("/{roomId}/members")
     public ResponseEntity<RoomResponse> joinRoom(
             @PathVariable("roomId") String roomId,
-            @RequestBody JoinRoomRequest request
+            @RequestBody JoinRoomRequest request, HttpSession session
     ) {
         JoinRoomCommand command = new JoinRoomCommand(
                 roomId,
@@ -58,6 +62,7 @@ public class RoomController {
         );
 
         Room room = joinRoomUseCase.joinRoom(command);
+        session.setAttribute("room:" + roomId, room.getMembers().get(room.getMembers().size() - 1).getId());
         RoomResponse response = RoomResponse.fromDomain(room);
 
         return ResponseEntity.ok(response);
@@ -69,8 +74,9 @@ public class RoomController {
     @PostMapping("/{roomId}/start")
     public ResponseEntity<RoomResponse> startVoting(
             @PathVariable("roomId") String roomId,
-            @RequestBody StartVotingRequest request
+            @RequestBody StartVotingRequest request, HttpSession session
     ) {
+        requireMember(session, roomId, request.getHostId());
         StartVotingCommand command = new StartVotingCommand(roomId, request.getHostId());
         Room room = startVotingUseCase.startVoting(command);
         RoomResponse response = RoomResponse.fromDomain(room);
@@ -84,8 +90,9 @@ public class RoomController {
     @PostMapping("/{roomId}/swipes")
     public ResponseEntity<RoomResponse> swipeMenu(
             @PathVariable("roomId") String roomId,
-            @RequestBody SwipeMenuRequest request
+            @RequestBody SwipeMenuRequest request, HttpSession session
     ) {
+        requireMember(session, roomId, request.getMemberId());
         SwipeMenuCommand command = new SwipeMenuCommand(
                 roomId,
                 request.getMemberId(),
@@ -107,5 +114,11 @@ public class RoomController {
         return getRoomUseCase.getRoom(roomId)
                 .map(room -> ResponseEntity.ok(RoomResponse.fromDomain(room)))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+    }
+
+    private void requireMember(HttpSession session, String roomId, UUID memberId) {
+        if (memberId == null || !memberId.equals(session.getAttribute("room:" + roomId))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "방에 참여한 브라우저에서 진행해 주세요.");
+        }
     }
 }
