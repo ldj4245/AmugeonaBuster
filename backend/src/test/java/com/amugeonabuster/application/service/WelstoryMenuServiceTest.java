@@ -23,6 +23,7 @@ public class WelstoryMenuServiceTest {
         }
         
         org.junit.jupiter.api.Assumptions.assumeTrue(
+            "true".equalsIgnoreCase(System.getenv("RUN_LIVE_WELSTORY_TESTS")) &&
             username != null && !username.isEmpty() && password != null && !password.isEmpty(),
             "Welstory credentials are not set. Skipping real-time API test."
         );
