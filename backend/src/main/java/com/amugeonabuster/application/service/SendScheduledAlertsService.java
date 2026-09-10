@@ -80,6 +80,10 @@ public class SendScheduledAlertsService implements SendScheduledAlertsCommand {
 
         // 2. 알림 설정 시간에 해당하는 식단만 필터링
         WelstoryMenuResult filteredMenu = menuQuery.filterMenuByTime(menu, setting.getScheduledTime());
+        if (!"AVAILABLE".equals(filteredMenu.getStatus()) || filteredMenu.getCourses().isEmpty()) {
+            log.warn("Skipping unverified or empty menu for scheduled alert");
+            return;
+        }
 
         // 3. 카카오톡 메시지 전송 시도
         boolean success = kakaoApiPort.sendWelstoryMenuToMe(setting.getKakaoAccessToken(), filteredMenu, setting.getCotNo(), setting.getHallNo());

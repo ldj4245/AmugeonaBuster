@@ -25,6 +25,15 @@ public class WelstoryMenuService implements GetTodayMenuQuery {
         return loadWelstoryMenuPort.loadTodayMenu(cotNo, hallNo, cafeteriaName);
     }
 
+    @Override
+    public WelstoryMenuResult getMenu(String cotNo, String hallNo, String cafeteriaName, java.time.LocalDate date) {
+        var today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        if (date.isBefore(today.minusDays(35)) || date.isAfter(today.plusDays(35))) {
+            throw new IllegalArgumentException("식단은 오늘 기준 5주 이내 날짜만 조회할 수 있습니다.");
+        }
+        return loadWelstoryMenuPort.loadMenu(cotNo, hallNo, cafeteriaName, date);
+    }
+
     /**
      * 알림 시간대별로 식단을 필터링하여 매칭되는 식단만 반환합니다.
      * 아침: 00:00 ~ 08:59 (hour < 9)
@@ -65,13 +74,16 @@ public class WelstoryMenuService implements GetTodayMenuQuery {
 
         if (filteredCourses.isEmpty()) {
             log.warn("No courses matched the filter '{}'. Returning original courses as fallback.", targetLabel);
-            return menu;
+            return WelstoryMenuResult.builder().cafeteriaName(menu.getCafeteriaName())
+                    .dateStr(menu.getDateStr()).courses(List.of()).status("EMPTY").build();
         }
 
         return WelstoryMenuResult.builder()
             .cafeteriaName(menu.getCafeteriaName())
             .dateStr(menu.getDateStr())
             .courses(filteredCourses)
+            .status(menu.getStatus())
+            .message(menu.getMessage())
             .build();
     }
 }

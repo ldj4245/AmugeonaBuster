@@ -138,6 +138,7 @@ class RoomControllerTest {
 
         // when & then
         mockMvc.perform(post("/api/rooms/{roomId}/start", roomId)
+                        .sessionAttr("room:" + roomId, hostId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -170,6 +171,7 @@ class RoomControllerTest {
 
         // when & then
         mockMvc.perform(post("/api/rooms/{roomId}/swipes", roomId)
+                        .sessionAttr("room:" + roomId, memberId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -215,5 +217,22 @@ class RoomControllerTest {
         mockMvc.perform(get("/api/rooms/{roomId}", roomId)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void rejectsAnotherMembersVote() throws Exception {
+        mockMvc.perform(post("/api/rooms/ROOM-ABC123/swipes")
+                .sessionAttr("room:ROOM-ABC123", UUID.randomUUID())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"memberId\":\"" + UUID.randomUUID() + "\",\"menuName\":\"치킨\",\"isLike\":true}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void rejectsStartingWithoutSession() throws Exception {
+        mockMvc.perform(post("/api/rooms/ROOM-ABC123/start")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"hostId\":\"" + UUID.randomUUID() + "\"}"))
+                .andExpect(status().isForbidden());
     }
 }

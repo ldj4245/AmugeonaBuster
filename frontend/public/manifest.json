@@ -3,15 +3,15 @@
   "name": "아무거나 버스터 (Amugeona Buster)",
   "icons": [
     {
-      "src": "/favicon.png",
-      "type": "image/png",
-      "sizes": "512x512",
-      "purpose": "any maskable"
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
     }
   ],
   "start_url": "/",
-  "background_color": "#ffffff",
-  "theme_color": "#f43f5e",
+  "background_color": "#f7f8fa",
+  "theme_color": "#202732",
   "display": "standalone",
   "orientation": "portrait"
 }

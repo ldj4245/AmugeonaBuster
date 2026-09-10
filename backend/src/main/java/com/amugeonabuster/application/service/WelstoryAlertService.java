@@ -51,6 +51,9 @@ public class WelstoryAlertService implements GetWelstoryAlertQuery, SaveWelstory
 
         // 2. 알림 설정 시간에 해당하는 식단만 필터링!
         WelstoryMenuResult filteredMenu = menuQuery.filterMenuByTime(menu, setting.getScheduledTime());
+        if (!"AVAILABLE".equals(filteredMenu.getStatus()) || filteredMenu.getCourses().isEmpty()) {
+            throw new IllegalArgumentException("현재 보낼 수 있는 식단이 없어요. 잠시 후 다시 확인해 주세요.");
+        }
 
         // 3. 카톡 나에게 보내기 발송
         boolean success = kakaoApiPort.sendWelstoryMenuToMe(setting.getKakaoAccessToken(), filteredMenu, setting.getCotNo(), setting.getHallNo());

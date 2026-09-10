@@ -12,6 +12,9 @@ public class WelstoryMenuResult {
     private final String cafeteriaName;
     private final String dateStr;
     private final List<CourseMenu> courses;
+    @Builder.Default
+    private final String status = "AVAILABLE";
+    private final String message;
 
     @Getter
     @Builder
