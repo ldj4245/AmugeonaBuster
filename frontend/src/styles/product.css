@@ -1913,7 +1913,7 @@ p {
     font-size: 11px;
   }
   .game-option:first-child {
-    grid-column: auto;
+    grid-column: 1 / -1;
   }
   .location select {
     max-width: 90px;
