@@ -1910,3 +1910,137 @@ textarea {
     scroll-behavior: auto !important;
   }
 }
+
+.location-field {
+  position: relative;
+}
+.location-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.location-input-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.location-input-wrap > svg {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  color: var(--muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.location-input-wrap input {
+  width: 100%;
+  padding-left: 40px;
+}
+.location-current-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.location-current-button:hover:not(:disabled) {
+  border-color: var(--green);
+  color: var(--green);
+}
+.location-current-button:disabled {
+  opacity: 0.55;
+}
+.location-suggestions {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  top: 73px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: 0 12px 30px rgba(31, 38, 49, 0.12);
+}
+.location-suggestions button {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 4px;
+  padding: 13px 15px;
+  text-align: left;
+  border-bottom: 1px solid #edf0f3;
+}
+.location-suggestions button:last-child {
+  border-bottom: 0;
+}
+.location-suggestions button:hover,
+.location-suggestions button:focus-visible {
+  background: #f5f7fa;
+}
+.location-suggestions strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.location-suggestions span,
+.location-confirmed,
+.location-message {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.location-message {
+  color: #9b5d38;
+}
+.room-header {
+  flex-wrap: wrap;
+}
+.room-header > small {
+  flex: 1 1 100%;
+  margin-left: 24px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.match-location {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.match-result > .kakao-map-card {
+  max-width: 650px;
+  margin: 28px auto;
+  text-align: left;
+}
+.restaurant-meta {
+  display: flex;
+  gap: 10px;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.restaurant-meta span:first-child {
+  color: var(--green);
+}
+@media (max-width: 580px) {
+  .location-input-row {
+    flex-direction: column;
+  }
+  .location-current-button {
+    min-height: 42px;
+  }
+  .location-suggestions {
+    top: 119px;
+  }
+  .match-result > .kakao-map-card {
+    margin-inline: -2px;
+  }
+}

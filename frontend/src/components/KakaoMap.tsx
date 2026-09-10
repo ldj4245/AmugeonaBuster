@@ -15,9 +15,11 @@ interface Restaurant {
 interface KakaoMapProps {
   matchedRestaurants: Restaurant[];
   location: string;
+  latitude?: number;
+  longitude?: number;
 }
 
-export function KakaoMap({ matchedRestaurants, location }: KakaoMapProps) {
+export function KakaoMap({ matchedRestaurants, location, latitude, longitude }: KakaoMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -33,15 +35,15 @@ export function KakaoMap({ matchedRestaurants, location }: KakaoMapProps) {
       return;
     }
 
-    // 2초 뒤에 맵이 로드되지 않았으면 에러 처리 (폴백 전환)
+    // 모바일 네트워크에서 SDK가 늦게 내려오는 경우를 고려해 충분히 기다린다.
     const timeoutId = setTimeout(() => {
       const win = window as any;
       if (!win.kakao || !win.kakao.maps) {
-        console.warn("Kakao Maps load timed out (2s limit). Falling back to Mock Map.");
+        console.warn("Kakao Maps load timed out (6s limit). Falling back to Mock Map.");
         setHasError(true);
         setIsLoading(false);
       }
-    }, 2000);
+    }, 6000);
 
     // 스크립트가 이미 있는지 확인
     const existingScript = document.getElementById('kakao-map-sdk');
@@ -82,7 +84,7 @@ export function KakaoMap({ matchedRestaurants, location }: KakaoMapProps) {
     return () => {
       clearTimeout(timeoutId);
     };
-  }, [matchedRestaurants]);
+  }, [matchedRestaurants, latitude, longitude]);
 
   const initializeMap = () => {
     if (!mapContainerRef.current) return;
@@ -108,7 +110,13 @@ export function KakaoMap({ matchedRestaurants, location }: KakaoMapProps) {
         }
       });
 
-      if (validCoordsCount > 0) {
+      const hasOrigin = typeof latitude === 'number' && typeof longitude === 'number'
+        && Number.isFinite(latitude) && Number.isFinite(longitude);
+
+      if (hasOrigin) {
+        avgLat = latitude;
+        avgLng = longitude;
+      } else if (validCoordsCount > 0) {
         avgLat /= validCoordsCount;
         avgLng /= validCoordsCount;
       } else {
@@ -123,6 +131,23 @@ export function KakaoMap({ matchedRestaurants, location }: KakaoMapProps) {
 
       const map = new win.kakao.maps.Map(container, options);
       const bounds = new win.kakao.maps.LatLngBounds();
+
+      if (hasOrigin) {
+        const origin = new win.kakao.maps.LatLng(latitude, longitude);
+        bounds.extend(origin);
+        new win.kakao.maps.Marker({ position: origin, map, title: "선택한 위치" });
+        new win.kakao.maps.Circle({
+          center: origin,
+          radius: 1000,
+          strokeWeight: 1,
+          strokeColor: '#526b9b',
+          strokeOpacity: 0.55,
+          strokeStyle: 'dashed',
+          fillColor: '#526b9b',
+          fillOpacity: 0.06,
+          map,
+        });
+      }
 
       const mapTypeControl = new win.kakao.maps.MapTypeControl();
       map.addControl(mapTypeControl, win.kakao.maps.ControlPosition.TOPRIGHT);
@@ -209,16 +234,16 @@ export function KakaoMap({ matchedRestaurants, location }: KakaoMapProps) {
 
   const renderMockMap = () => {
     return (
-      <div className="w-full bg-white/80 backdrop-blur-xl border border-white/60 shadow-xl rounded-3xl p-6 relative overflow-hidden">
+      <div className="kakao-map-card w-full bg-white/80 backdrop-blur-xl border border-white/60 shadow-xl rounded-3xl p-6 relative overflow-hidden">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
             <Compass className="w-4 h-4 text-rose-500" />
-            📍 {location} 맛집 매칭 지도
+            📍 {location} 주변 식당
           </h3>
           
           <div className="flex items-center gap-1 bg-amber-50 border border-amber-200/50 text-[10px] text-amber-600 px-2 py-0.5 rounded-full font-bold">
             <AlertCircle className="w-3 h-3 text-amber-500 shrink-0" />
-            예비 모의 지도 전환됨
+            지도 미리보기
           </div>
         </div>
         
@@ -268,7 +293,7 @@ export function KakaoMap({ matchedRestaurants, location }: KakaoMapProps) {
   }
 
   return (
-    <div className="w-full bg-white/80 backdrop-blur-xl border border-white/60 shadow-xl rounded-3xl p-6 relative overflow-hidden">
+    <div className="kakao-map-card w-full bg-white/80 backdrop-blur-xl border border-white/60 shadow-xl rounded-3xl p-6 relative overflow-hidden">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
           <Compass className="w-4 h-4 text-rose-500" />

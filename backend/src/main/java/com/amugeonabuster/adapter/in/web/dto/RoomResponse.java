@@ -18,6 +18,10 @@ public class RoomResponse {
     private final String roomId;
     private final UUID hostId;
     private final String location;
+    private final String locationAddress;
+    private final String locationPlaceId;
+    private final Double latitude;
+    private final Double longitude;
     private final RoomStatus status;
     private final List<MemberResponse> members;
     private final String winningMenu;
@@ -92,6 +96,10 @@ public class RoomResponse {
                 .roomId(room.getId())
                 .hostId(room.getHostId())
                 .location(room.getLocation())
+                .locationAddress(room.getLocationAddress())
+                .locationPlaceId(room.getLocationPlaceId())
+                .latitude(room.getLatitude())
+                .longitude(room.getLongitude())
                 .status(room.getStatus())
                 .members(memberResponses)
                 .winningMenu(room.getWinningMenu())

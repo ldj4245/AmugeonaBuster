@@ -26,6 +26,16 @@ public class RoomJpaEntity {
     @Column(nullable = false)
     private String location;
 
+    @Column(length = 160)
+    private String locationAddress;
+
+    @Column(length = 80)
+    private String locationPlaceId;
+
+    private Double latitude;
+
+    private Double longitude;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private RoomStatus status;
@@ -48,10 +58,16 @@ public class RoomJpaEntity {
     private List<RestaurantJpaEntity> matchedRestaurants = new ArrayList<>();
 
     @Builder
-    public RoomJpaEntity(String id, UUID hostId, String location, RoomStatus status, int maxSwipeCount, List<MemberJpaEntity> members, List<SwipeJpaEntity> swipes, String winningMenu, List<RestaurantJpaEntity> matchedRestaurants, String customMenus) {
+    public RoomJpaEntity(String id, UUID hostId, String location, String locationAddress, String locationPlaceId,
+            Double latitude, Double longitude, RoomStatus status, int maxSwipeCount, List<MemberJpaEntity> members,
+            List<SwipeJpaEntity> swipes, String winningMenu, List<RestaurantJpaEntity> matchedRestaurants, String customMenus) {
         this.id = id;
         this.hostId = hostId;
         this.location = location;
+        this.locationAddress = locationAddress != null ? locationAddress : "";
+        this.locationPlaceId = locationPlaceId != null ? locationPlaceId : "";
+        this.latitude = latitude;
+        this.longitude = longitude;
         this.status = status;
         this.maxSwipeCount = maxSwipeCount != 0 ? maxSwipeCount : 15;
         this.members = members != null ? members : new ArrayList<>();

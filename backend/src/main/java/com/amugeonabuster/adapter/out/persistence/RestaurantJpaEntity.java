@@ -37,12 +37,22 @@ public class RestaurantJpaEntity {
     @Column(length = 500)
     private String placeUrl;
 
+    @Column(length = 80)
+    private String externalPlaceId;
+
+    @Column
+    private int distanceMeters;
+
+    @Column(length = 30)
+    private String matchType;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "room_id")
     private RoomJpaEntity room;
 
     @Builder
-    public RestaurantJpaEntity(UUID id, String name, String address, double latitude, double longitude, String phone, String category, String placeUrl) {
+    public RestaurantJpaEntity(UUID id, String name, String address, double latitude, double longitude, String phone,
+            String category, String placeUrl, String externalPlaceId, int distanceMeters, String matchType) {
         this.id = id != null ? id : UUID.randomUUID();
         this.name = name;
         this.address = address;
@@ -51,6 +61,9 @@ public class RestaurantJpaEntity {
         this.phone = phone;
         this.category = category != null ? category : "";
         this.placeUrl = placeUrl != null ? placeUrl : "";
+        this.externalPlaceId = externalPlaceId != null ? externalPlaceId : "";
+        this.distanceMeters = Math.max(distanceMeters, 0);
+        this.matchType = matchType != null && !matchType.isBlank() ? matchType : "NEARBY";
     }
 
     /**

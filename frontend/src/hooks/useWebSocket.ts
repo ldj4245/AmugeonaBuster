@@ -6,6 +6,10 @@ export interface WebSocketRoomResponse {
   roomId: string;
   hostId: string;
   location: string;
+  locationAddress?: string;
+  locationPlaceId?: string;
+  latitude?: number;
+  longitude?: number;
   status: 'LOBBY' | 'PLAYING' | 'COMPLETED';
   members: Array<{ id: string; nickname: string; isReady: boolean }>;
   winningMenu?: string;
@@ -18,6 +22,9 @@ export interface WebSocketRoomResponse {
     phone?: string;
     category?: string;
     placeUrl?: string;
+    externalPlaceId?: string;
+    distanceMeters: number;
+    matchType: 'MENU_MATCH' | 'NEARBY';
   }>;
   defaultMenus: string[];
   totalMembers: number;

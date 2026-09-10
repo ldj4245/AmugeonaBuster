@@ -20,6 +20,10 @@ public interface CreateRoomUseCase {
     class CreateRoomCommand {
         private final String hostNickname;
         private final String location;
+        private String locationAddress;
+        private String locationPlaceId;
+        private Double latitude;
+        private Double longitude;
         private final int maxSwipeCount;
         private final List<String> customMenus;
 
@@ -47,6 +51,30 @@ public interface CreateRoomUseCase {
             }
             this.customMenus = customMenus != null && !customMenus.isEmpty() ? List.copyOf(customMenus) : com.amugeonabuster.domain.model.DefaultMenus.MENUS;
             this.maxSwipeCount = this.customMenus.size();
+        }
+
+        public CreateRoomCommand(String hostNickname, String location, List<String> customMenus,
+                String locationAddress, String locationPlaceId, Double latitude, Double longitude) {
+            this(hostNickname, location, customMenus);
+            setLocationDetails(locationAddress, locationPlaceId, latitude, longitude);
+        }
+
+        public CreateRoomCommand(String hostNickname, String location, int maxSwipeCount,
+                String locationAddress, String locationPlaceId, Double latitude, Double longitude) {
+            this(hostNickname, location, maxSwipeCount);
+            setLocationDetails(locationAddress, locationPlaceId, latitude, longitude);
+        }
+
+        private void setLocationDetails(String locationAddress, String locationPlaceId, Double latitude, Double longitude) {
+            if ((latitude == null) != (longitude == null)
+                    || (latitude != null && (!Double.isFinite(latitude) || !Double.isFinite(longitude)
+                    || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180))) {
+                throw new IllegalArgumentException("약속 장소 좌표를 확인해 주세요.");
+            }
+            this.locationAddress = locationAddress;
+            this.locationPlaceId = locationPlaceId;
+            this.latitude = latitude;
+            this.longitude = longitude;
         }
     }
 }

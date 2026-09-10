@@ -15,9 +15,13 @@ public class Restaurant {
     private final String phone;
     private final String category;
     private final String placeUrl;
+    private final String externalPlaceId;
+    private final int distanceMeters;
+    private final String matchType;
 
     @Builder
-    public Restaurant(UUID id, String name, String address, double latitude, double longitude, String phone, String category, String placeUrl) {
+    public Restaurant(UUID id, String name, String address, double latitude, double longitude, String phone,
+            String category, String placeUrl, String externalPlaceId, int distanceMeters, String matchType) {
         this.id = id != null ? id : UUID.randomUUID();
         this.name = name;
         this.address = address;
@@ -26,5 +30,8 @@ public class Restaurant {
         this.phone = phone;
         this.category = category != null ? category : "";
         this.placeUrl = placeUrl != null ? placeUrl : "";
+        this.externalPlaceId = externalPlaceId != null ? externalPlaceId : "";
+        this.distanceMeters = Math.max(distanceMeters, 0);
+        this.matchType = matchType != null && !matchType.isBlank() ? matchType : "NEARBY";
     }
 }

@@ -38,7 +38,11 @@ public class RoomController {
         CreateRoomCommand command = new CreateRoomCommand(
                 request.getHostNickname(),
                 request.getLocation(),
-                request.getCustomMenus()
+                request.getCustomMenus(),
+                request.getLocationAddress(),
+                request.getLocationPlaceId(),
+                request.getLatitude(),
+                request.getLongitude()
         );
 
         Room room = createRoomUseCase.createRoom(command);

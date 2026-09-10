@@ -17,6 +17,9 @@ public class RestaurantResponse {
     private final String phone;
     private final String category;
     private final String placeUrl;
+    private final String externalPlaceId;
+    private final int distanceMeters;
+    private final String matchType;
 
     public static RestaurantResponse fromDomain(Restaurant restaurant) {
         if (restaurant == null) {
@@ -31,6 +34,9 @@ public class RestaurantResponse {
                 .phone(restaurant.getPhone())
                 .category(restaurant.getCategory())
                 .placeUrl(restaurant.getPlaceUrl())
+                .externalPlaceId(restaurant.getExternalPlaceId())
+                .distanceMeters(restaurant.getDistanceMeters())
+                .matchType(restaurant.getMatchType())
                 .build();
     }
 }

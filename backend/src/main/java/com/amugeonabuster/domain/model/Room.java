@@ -17,6 +17,10 @@ public class Room {
     private final String id;
     private final UUID hostId;
     private final String location;
+    private final String locationAddress;
+    private final String locationPlaceId;
+    private final Double latitude;
+    private final Double longitude;
     private RoomStatus status;
     private final List<Member> members;
     private final List<Swipe> swipes;
@@ -28,10 +32,16 @@ public class Room {
     private static final int MAX_MEMBER_SIZE = 10;
 
     @Builder
-    public Room(String id, UUID hostId, String location, RoomStatus status, List<Member> members, List<Swipe> swipes, String winningMenu, List<Restaurant> matchedRestaurants, int maxSwipeCount, List<String> customMenus) {
+    public Room(String id, UUID hostId, String location, String locationAddress, String locationPlaceId,
+            Double latitude, Double longitude, RoomStatus status, List<Member> members, List<Swipe> swipes,
+            String winningMenu, List<Restaurant> matchedRestaurants, int maxSwipeCount, List<String> customMenus) {
         this.id = id;
         this.hostId = hostId;
         this.location = location;
+        this.locationAddress = locationAddress != null ? locationAddress : "";
+        this.locationPlaceId = locationPlaceId != null ? locationPlaceId : "";
+        this.latitude = latitude;
+        this.longitude = longitude;
         this.status = status != null ? status : RoomStatus.LOBBY;
         this.members = members != null ? new ArrayList<>(members) : new ArrayList<>();
         this.swipes = swipes != null ? new ArrayList<>(swipes) : new ArrayList<>();
@@ -49,6 +59,13 @@ public class Room {
             this.customMenus = new ArrayList<>(DefaultMenus.MENUS.subList(0, limit));
             this.maxSwipeCount = limit;
         }
+    }
+
+    public boolean hasLocationCoordinates() {
+        return latitude != null && longitude != null
+                && latitude >= -90 && latitude <= 90
+                && longitude >= -180 && longitude <= 180
+                && (latitude != 0 || longitude != 0);
     }
 
     /**
