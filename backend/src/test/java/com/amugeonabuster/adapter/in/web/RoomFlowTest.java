@@ -19,7 +19,15 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties = {"app.alerts.enabled=false", "spring.jpa.show-sql=false"})
+@SpringBootTest(properties = {
+        "app.alerts.enabled=false",
+        "spring.jpa.show-sql=false",
+        "spring.datasource.url=jdbc:h2:mem:roomflow;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
+        "spring.datasource.driver-class-name=org.h2.Driver",
+        "spring.datasource.username=sa",
+        "spring.datasource.password=",
+        "spring.jpa.hibernate.ddl-auto=create-drop"
+})
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
 class RoomFlowTest {
