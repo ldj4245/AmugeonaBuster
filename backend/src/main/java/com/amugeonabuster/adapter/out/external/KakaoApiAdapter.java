@@ -18,7 +18,7 @@ import org.springframework.web.client.RestClient;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -173,18 +173,18 @@ public class KakaoApiAdapter implements KakaoApiPort {
 
     @Override
     public boolean sendWelstoryMenuToMe(String accessToken, WelstoryMenuResult menu, String cotNo, String hallNo) {
-        log.info("Sending Welstory menu to user KakaoTalk using LIST template. Cafeteria: {}, cotNo: {}, hallNo: {}", menu.getCafeteriaName(), cotNo, hallNo);
+        log.info("Sending Welstory menu to KakaoTalk. Cafeteria: {}", menu.getCafeteriaName());
 
         try {
             String encodedLoc = URLEncoder.encode(menu.getCafeteriaName(), StandardCharsets.UTF_8);
             String viewMenuUrl = "https://amugeona-buster-6eda848df67d.herokuapp.com/?view-menu=true&cotNo="
                 + cotNo + "&hallNo=" + hallNo + "&name=" + encodedLoc;
 
-            Map<String, Object> template = new HashMap<>();
+            Map<String, Object> template = new LinkedHashMap<>();
             template.put("object_type", "list");
-            template.put("header_title", "🍱 " + menu.getCafeteriaName());
+            template.put("header_title", menu.getCafeteriaName());
 
-            Map<String, String> headerLink = new HashMap<>();
+            Map<String, String> headerLink = new LinkedHashMap<>();
             headerLink.put("web_url", viewMenuUrl);
             headerLink.put("mobile_web_url", viewMenuUrl);
             template.put("header_link", headerLink);
@@ -193,34 +193,29 @@ public class KakaoApiAdapter implements KakaoApiPort {
             List<WelstoryMenuResult.CourseMenu> courses = menu.getCourses();
 
             if (courses == null || courses.isEmpty()) {
-                Map<String, Object> item = new HashMap<>();
-                item.put("title", "오늘의 구내식당 식단");
-                item.put("description", "등록된 식단 정보가 없습니다.");
-                item.put("image_url", "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200");
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("title", "등록된 식단 없음");
+                item.put("description", menu.getMessage() == null || menu.getMessage().isBlank()
+                        ? "등록된 메뉴가 없습니다."
+                        : menu.getMessage());
                 item.put("link", headerLink);
                 contents.add(item);
             } else {
                 int limit = Math.min(courses.size(), 3);
                 for (int i = 0; i < limit; i++) {
                     WelstoryMenuResult.CourseMenu course = courses.get(i);
-                    Map<String, Object> item = new HashMap<>();
+                    Map<String, Object> item = new LinkedHashMap<>();
 
-                    item.put("title", "⭐ " + course.getCourseName() + " (" + course.getCalories() + "kcal)");
+                    String title = cleanCourseTitle(course.getCourseName());
+                    if (course.getCalories() > 0) {
+                        title += " · " + course.getCalories() + "kcal";
+                    }
+                    item.put("title", truncate(title, 40));
+                    item.put("description", compactMenuDetails(course.getMenuDetails()));
 
-                    String details = course.getMenuDetails().replace("\n", ", ").trim();
-                    if (details.endsWith(",")) {
-                        details = details.substring(0, details.length() - 1);
+                    if (course.getImageUrl() != null && !course.getImageUrl().isBlank()) {
+                        item.put("image_url", course.getImageUrl());
                     }
-                    if (details.length() > 50) {
-                        details = details.substring(0, 47) + "...";
-                    }
-                    item.put("description", details);
-
-                    String img = course.getImageUrl();
-                    if (img == null || img.isEmpty()) {
-                        img = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200";
-                    }
-                    item.put("image_url", img);
                     item.put("link", headerLink);
                     contents.add(item);
                 }
@@ -229,10 +224,10 @@ public class KakaoApiAdapter implements KakaoApiPort {
 
             List<Map<String, Object>> buttons = new ArrayList<>();
 
-            Map<String, Object> btnEscape = new HashMap<>();
-            btnEscape.put("title", "🔥 구식 싫어요! 외부 맛집 추천");
+            Map<String, Object> btnEscape = new LinkedHashMap<>();
+            btnEscape.put("title", "다른 식당 찾기");
 
-            Map<String, String> escapeLink = new HashMap<>();
+            Map<String, String> escapeLink = new LinkedHashMap<>();
             String escapeUrl = "https://amugeona-buster-6eda848df67d.herokuapp.com/?escape=true&location=" + encodedLoc;
             escapeLink.put("web_url", escapeUrl);
             escapeLink.put("mobile_web_url", escapeUrl);
@@ -240,10 +235,10 @@ public class KakaoApiAdapter implements KakaoApiPort {
             btnEscape.put("link", escapeLink);
             buttons.add(btnEscape);
 
-            Map<String, Object> btnSettings = new HashMap<>();
-            btnSettings.put("title", "💬 오늘 메뉴 자세히 보기 (전체 코스)");
+            Map<String, Object> btnSettings = new LinkedHashMap<>();
+            btnSettings.put("title", "전체 메뉴 보기");
 
-            Map<String, String> settingsLink = new HashMap<>();
+            Map<String, String> settingsLink = new LinkedHashMap<>();
             settingsLink.put("web_url", viewMenuUrl);
             settingsLink.put("mobile_web_url", viewMenuUrl);
 
@@ -254,8 +249,6 @@ public class KakaoApiAdapter implements KakaoApiPort {
 
             ObjectMapper mapper = new ObjectMapper();
             String templateJson = mapper.writeValueAsString(template);
-
-            log.info("Sending List Template json: {}", templateJson);
 
             MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
             body.add("template_object", templateJson);
@@ -268,12 +261,41 @@ public class KakaoApiAdapter implements KakaoApiPort {
                 .retrieve()
                 .toBodilessEntity();
 
-            log.info("Successfully sent Welstory LIST menu KakaoTalk message!");
+            log.info("Successfully sent Welstory menu KakaoTalk message.");
             return true;
 
         } catch (Exception e) {
             log.error("Failed to send KakaoTalk LIST memo message: {}", e.getMessage(), e);
             return false;
         }
+    }
+
+    static String cleanCourseTitle(String value) {
+        if (value == null || value.isBlank()) return "오늘의 메뉴";
+        return value.replaceAll("\\s*\\([^)]*\\)", "")
+                .replaceAll("\\s*\\[[^]]*\\]", "")
+                .replaceAll("\\s{2,}", " ")
+                .trim();
+    }
+
+    static String compactMenuDetails(String value) {
+        if (value == null || value.isBlank()) return "메뉴 설명이 없습니다.";
+        String[] pieces = value.replace('\n', ',').split(",");
+        StringBuilder result = new StringBuilder();
+        int shown = 0;
+        for (String piece : pieces) {
+            String cleaned = piece.replaceAll("\\s*\\([^)]*[A-Za-z][^)]*\\)", "")
+                    .replaceAll("\\s{2,}", " ").trim();
+            if (cleaned.isBlank()) continue;
+            if (result.length() > 0) result.append(" · ");
+            result.append(cleaned);
+            if (++shown == 2) break;
+        }
+        return truncate(result.length() == 0 ? "메뉴 설명이 없습니다." : result.toString(), 55);
+    }
+
+    private static String truncate(String value, int max) {
+        if (value.length() <= max) return value;
+        return value.substring(0, Math.max(0, max - 1)).trim() + "…";
     }
 }
