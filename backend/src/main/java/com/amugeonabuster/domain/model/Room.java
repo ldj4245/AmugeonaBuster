@@ -15,7 +15,9 @@ import java.util.stream.Collectors;
 @Getter
 public class Room {
     private final String id;
-    private final UUID hostId;
+    private UUID hostId;
+    private java.time.Instant createdAt;
+    private UUID selectedRestaurantId;
     private final String location;
     private final String locationAddress;
     private final String locationPlaceId;
@@ -34,7 +36,9 @@ public class Room {
     @Builder
     public Room(String id, UUID hostId, String location, String locationAddress, String locationPlaceId,
             Double latitude, Double longitude, RoomStatus status, List<Member> members, List<Swipe> swipes,
-            String winningMenu, List<Restaurant> matchedRestaurants, int maxSwipeCount, List<String> customMenus) {
+            String winningMenu, List<Restaurant> matchedRestaurants, int maxSwipeCount, List<String> customMenus, java.time.Instant createdAt, UUID selectedRestaurantId) {
+        this.createdAt = createdAt;
+        this.selectedRestaurantId = selectedRestaurantId;
         this.id = id;
         this.hostId = hostId;
         this.location = location;
@@ -90,7 +94,25 @@ public class Room {
     /**
      * 신규 멤버 가입 비즈니스 룰
      */
+    public boolean isExpired() {
+        return createdAt != null && createdAt.isBefore(java.time.Instant.now().minusSeconds(10800));
+    }
+
+    public void leave(UUID memberId) {
+        members.removeIf(m -> m.getId().equals(memberId));
+        swipes.removeIf(s -> s.getMemberId().equals(memberId));
+        if (memberId.equals(hostId) && !members.isEmpty()) hostId = members.get(0).getId();
+    }
+
+    public void selectRestaurant(UUID actor, UUID restaurantId) {
+        if (!hostId.equals(actor)) throw new IllegalArgumentException("방장만 식당을 확정할 수 있습니다.");
+        if (status != RoomStatus.COMPLETED || matchedRestaurants.stream().noneMatch(r -> r.getId().equals(restaurantId)))
+            throw new IllegalArgumentException("결과에 있는 식당을 선택해 주세요.");
+        selectedRestaurantId = restaurantId;
+    }
+
     public void joinMember(Member newMember) {
+        if (isExpired()) throw new IllegalArgumentException("만료된 방입니다. 새 방을 만들어 주세요.");
         if (this.status != RoomStatus.LOBBY) {
             throw new InvalidRoomStateException("이미 게임이 시작되었거나 종료된 방에는 참여할 수 없습니다.");
         }
@@ -111,6 +133,7 @@ public class Room {
      * 방장의 게임(투표) 시작 비즈니스 룰
      */
     public void startVoting(UUID requesterId) {
+        if (isExpired()) throw new IllegalArgumentException("만료된 방입니다.");
         if (!this.hostId.equals(requesterId)) {
             throw new UnauthorizedHostException("방장만 게임을 시작할 수 있습니다.");
         }
@@ -124,6 +147,7 @@ public class Room {
      * 메뉴 스와이프 등록 비즈니스 룰 (멱등성 보장)
      */
     public void swipeMenu(UUID memberId, String menuName, boolean isLike) {
+        if (isExpired()) throw new IllegalArgumentException("만료된 방입니다.");
         if (!this.customMenus.contains(menuName)) {
             throw new IllegalArgumentException("이 방의 후보 메뉴만 선택할 수 있습니다.");
         }
@@ -199,7 +223,7 @@ public class Room {
             double fallbackScore = likes * 1.0 - dislikes * 0.5;
             boolean isVetoed = dislikes > 0;
 
-            scores.add(new MenuScore(menu, i, likes, dislikes, regularScore, fallbackScore, isVetoed));
+            if (likes + dislikes > 0) scores.add(new MenuScore(menu, i, likes, dislikes, regularScore, fallbackScore, isVetoed));
         }
 
         // F-402 거부권 필터링 시도

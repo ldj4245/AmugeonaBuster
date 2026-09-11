@@ -32,6 +32,8 @@ const menus = [
   "팟타이",
 ];
 type Room = WebSocketRoomResponse;
+type RoomSummary = { roomId: string; location: string; memberCount: number; status: Room['status']; createdAt: string };
+type Membership = { memberId: string; room: Room; swiped: string[] };
 const formatDistance = (meters: number) =>
   meters < 1000 ? `${meters}m` : `${(meters / 1000).toFixed(1)}km`;
 interface LocationCandidate {
@@ -67,21 +69,62 @@ export const RoomPage = (): React.JSX.Element => {
   const [swiped, setSwiped] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [rooms, setRooms] = useState<RoomSummary[]>([]);
+  const [listLoading, setListLoading] = useState(true);
+  const [listError, setListError] = useState("");
+  const [filter, setFilter] = useState("");
+  const [showForm, setShowForm] = useState(() => new URLSearchParams(window.location.search).has("room"));
+  const [closing, setClosing] = useState(false);
+  const formRef = useRef<HTMLDivElement>(null);
+  const loadRooms = useCallback(async () => {
+    try { setRooms(await api<RoomSummary[]>("/rooms")); setListError(""); }
+    catch { setListError("방 목록을 불러오지 못했습니다. 다시 시도해 주세요."); }
+    finally { setListLoading(false); }
+  }, []);
+  useEffect(() => {
+    if (room) return;
+    loadRooms();
+    const timer = window.setInterval(() => { if (!document.hidden) loadRooms(); }, 10000);
+    return () => window.clearInterval(timer);
+  }, [room?.roomId, loadRooms]);
+  const restore = useCallback((value: Membership) => {
+    setRoom(value.room); setMember(value.memberId); setSwiped(value.swiped);
+    saveLocal("club-active-room", value.room.roomId);
+    window.history.replaceState({}, "", `?room=${encodeURIComponent(value.room.roomId)}#rooms`);
+  }, []);
   const voteLock = useRef(false);
   const onMessage = useCallback((value: Room) => setRoom(value), []);
   useWebSocket(room?.roomId || null, onMessage);
   useEffect(() => {
-    if (!code) return;
+    const remembered = code || readLocal<string>("club-active-room", "");
+    if (!remembered) return;
     const controller = new AbortController();
-    api<Room>(`/rooms/${encodeURIComponent(code)}`, {
+    api<Membership>(`/rooms/${encodeURIComponent(remembered)}/me`, {
       signal: controller.signal,
     })
-      .then((data) => {
-        if (data.status === "COMPLETED") setRoom(data);
-      })
-      .catch(() => undefined);
+      .then(restore)
+      .catch(async () => {
+        if (!code || controller.signal.aborted) return;
+        try {
+          const shared = await api<Room>(`/rooms/${encodeURIComponent(code)}`, { signal: controller.signal });
+          if (shared.status === "COMPLETED") setRoom(shared);
+        } catch { /* 참여 폼에서 초대 코드를 다시 입력할 수 있습니다. */ }
+      });
     return () => controller.abort();
   }, []);
+  useEffect(() => {
+    if (!room || !member) return;
+    const controller = new AbortController();
+    const refresh = () => {
+      if (document.hidden) return;
+      api<Membership>(`/rooms/${room.roomId}/me`, { signal: controller.signal })
+        .then(value => { setRoom(value.room); setSwiped(value.swiped); })
+        .catch(() => undefined);
+    };
+    const timer = window.setInterval(refresh, 10000);
+    window.addEventListener("focus", refresh);
+    return () => { controller.abort(); window.clearInterval(timer); window.removeEventListener("focus", refresh); };
+  }, [room?.roomId, member]);
   useEffect(() => {
     if (join || locationConfirmed || location.trim().length < 2) {
       setLocationSuggestions([]);
@@ -128,11 +171,17 @@ export const RoomPage = (): React.JSX.Element => {
           longitude: longitude ?? undefined,
           customMenus: selected,
         });
-    const mine = data.members[data.members.length - 1].id;
-    setMember(mine);
-    setRoom(data);
-    setSwiped([]);
+    restore(await api<Membership>(`/rooms/${data.roomId}/me`));
   };
+  const participate = (id: string) => perform(async () => {
+    if (!nickname.trim()) {
+      setCode(id); setJoin(true); setShowForm(true);
+      window.setTimeout(() => formRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }), 0);
+      return;
+    }
+    await post<Room>(`/rooms/${id}/members`, { guestNickname: nickname.trim() });
+    restore(await api<Membership>(`/rooms/${id}/me`));
+  });
   const useCurrentLocation = () => {
     if (!navigator.geolocation) {
       setLocationMessage("이 브라우저에서는 현재 위치를 사용할 수 없습니다. 장소를 검색해 주세요.");
@@ -200,12 +249,12 @@ export const RoomPage = (): React.JSX.Element => {
     voteLock.current = false;
   };
   return (
-    <section className="page-enter">
+    <section className="page-enter rooms-page">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">LET’S PICK TOGETHER</span>
+          <span className="eyebrow">함께 정하는 점심</span>
           <h1>메뉴 투표</h1>
-          <p>후보 메뉴를 선택하고 참여자를 초대하세요.</p>
+          <p>{room ? "메뉴를 고르고, 오늘 갈 식당까지 정해요." : "동료가 만든 방에 참여하거나 새 방을 만들어 보세요."}</p>
         </div>
         <Users size={42} strokeWidth={1} />
       </div>
@@ -215,7 +264,27 @@ export const RoomPage = (): React.JSX.Element => {
         </p>
       )}
       {!room ? (
-        <div className="room-setup settings-card">
+        <>
+        <div className="room-directory">
+          <div className="directory-heading"><div><h2>함께 먹을 사람</h2><p>최근 3시간의 방 · 최대 10명</p></div>
+            <button className="button primary" onClick={() => { setShowForm(true); setJoin(false); window.setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0); }}>방 만들기 <ArrowRight size={16}/></button>
+          </div>
+          <div className="directory-tools"><label><Search size={17}/><input aria-label="방 검색" placeholder="장소 또는 방 코드 검색" value={filter} onChange={e => setFilter(e.target.value)}/></label><button className="icon-button" aria-label="방 목록 새로고침" onClick={loadRooms}><RefreshCw size={17}/></button></div>
+          {listError ? <p className="notice" role="alert">{listError}</p> : listLoading ? <p className="directory-empty">방을 불러오는 중…</p> : (
+          <div className="room-directory-grid">
+            {rooms.filter(r => `${r.location} ${r.roomId}`.toLowerCase().includes(filter.toLowerCase())).map(r => (
+              <article className="directory-card" key={r.roomId}>
+                <div className="directory-card-top"><span className={`room-status ${r.status.toLowerCase()}`}>{r.status === "LOBBY" ? "모집 중" : r.status === "PLAYING" ? "투표 중" : "종료"}</span><small>{new Date(r.createdAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}</small></div>
+                <h3><MapPin size={19}/>{r.location}</h3><p>{r.roomId}</p>
+                <div className="directory-card-bottom"><span><Users size={16}/>{r.memberCount} / 10명</span><button disabled={busy || r.status !== "LOBBY" || r.memberCount >= 10} onClick={() => participate(r.roomId)}>{r.memberCount >= 10 ? "정원 마감" : r.status === "LOBBY" ? "참여하기" : r.status === "PLAYING" ? "진행 중" : "투표 종료"}<ArrowRight size={15}/></button></div>
+              </article>
+            ))}
+            {!rooms.some(r => `${r.location} ${r.roomId}`.toLowerCase().includes(filter.toLowerCase())) && <div className="directory-empty"><Users size={30}/><h3>{filter ? "검색한 방이 없습니다" : "아직 만들어진 방이 없습니다"}</h3><p>첫 방을 만들고 동료를 초대해 보세요.</p></div>}
+          </div>)}
+          <button className="text-button" onClick={() => { setShowForm(true); setJoin(true); }}>초대 코드로 참여</button>
+        </div>
+        {showForm && <div className="room-setup settings-card" ref={formRef}>
+          <h2>{join ? "방에 참여하기" : "새 점심 모임"}</h2><p className="setup-description">{join ? "동료들이 알아볼 이름을 입력하세요." : "장소와 먹고 싶은 메뉴를 골라주세요. 만든 방은 목록에 공개됩니다."}</p>
           <div className="meal-tabs">
             <button
               className={!join ? "active" : ""}
@@ -374,7 +443,8 @@ export const RoomPage = (): React.JSX.Element => {
               <ArrowRight size={17} />
             </button>
           </form>
-        </div>
+        </div>}
+        </>
       ) : (
         <>
           <div className="room-header">
@@ -386,23 +456,29 @@ export const RoomPage = (): React.JSX.Element => {
             <span>{room.members.length}명 참여 중</span>
             <button
               className="text-button"
-              onClick={() => {
+              disabled={busy}
+              onClick={() => perform(async () => {
+                if (member) await post(`/rooms/${room.roomId}/leave`, { memberId: member });
+                saveLocal("club-active-room", "");
                 setRoom(null);
                 setMember("");
                 setSwiped([]);
+                setCode("");
+                setShowForm(false);
+                setClosing(false);
                 window.history.replaceState(
                   {},
                   "",
                   `${window.location.pathname}#rooms`,
                 );
-              }}
+              })}
             >
-              처음으로
+              {member ? "방 나가기" : "방 목록"}
             </button>
           </div>
           {room.status === "LOBBY" && (
             <div className="lobby settings-card">
-              <span className="eyebrow">INVITE YOUR LUNCH MATES</span>
+              <span className="eyebrow">동료를 기다리는 중</span>
               <h2>참여자 초대</h2>
               <div className="invite-code">
                 {room.roomId}
@@ -458,6 +534,7 @@ export const RoomPage = (): React.JSX.Element => {
           )}
           {room.status === "PLAYING" && (
             <div className="voting settings-card">
+              <progress className="vote-progress" aria-label="내 투표 진행률" max={room.defaultMenus.length} value={swiped.length}/>
               {nextMenu ? (
                 <>
                   <span className="eyebrow">
@@ -472,7 +549,7 @@ export const RoomPage = (): React.JSX.Element => {
                       onClick={() => vote(false)}
                     >
                       <X size={21} />
-                      선호하지 않음
+                      다음에 먹기
                     </button>
                     <button
                       className="button primary"
@@ -480,7 +557,7 @@ export const RoomPage = (): React.JSX.Element => {
                       onClick={() => vote(true)}
                     >
                       <Heart size={21} />
-                      선호함
+                      좋아요
                     </button>
                   </div>
                 </>
@@ -505,6 +582,7 @@ export const RoomPage = (): React.JSX.Element => {
                   </button>
                 </>
               )}
+              {member === room.hostId && <div className="close-voting">{closing ? <><p>아직 투표하지 않은 선택은 제외하고, 지금 모인 표로 결정합니다.</p><button className="button secondary" disabled={busy} onClick={() => perform(async () => { setRoom(await post<Room>(`/rooms/${room.roomId}/close`, { memberId: member })); setClosing(false); })}>지금 마감</button><button className="text-button" onClick={() => setClosing(false)}>계속 기다리기</button></> : <button className="text-button" onClick={() => setClosing(true)}>방장 · 투표 마감하기</button>}</div>}
             </div>
           )}
           {room.status === "COMPLETED" && (
@@ -514,6 +592,7 @@ export const RoomPage = (): React.JSX.Element => {
                 오늘은 <em>{room.winningMenu}</em>
               </h2>
               <p>참여자 투표를 합산한 결과입니다.</p>
+              {room.selectedRestaurantId && <div className="selected-restaurant"><span>오늘 만날 곳</span><h3>{room.matchedRestaurants.find(r => r.id === room.selectedRestaurantId)?.name}</h3><button className="text-button" onClick={() => perform(async () => { const r = room.matchedRestaurants.find(r => r.id === room.selectedRestaurantId)!; await navigator.clipboard.writeText(`${r.name}\n${r.address}\n${window.location.origin}/?room=${room.roomId}#rooms`); setMessage("식당 정보를 복사했습니다."); })}><Copy size={15}/>약속 공유</button></div>}
               {room.locationAddress && (
                 <p className="match-location">
                   <MapPin size={14} /> {room.locationAddress} 기준 1km
@@ -530,8 +609,8 @@ export const RoomPage = (): React.JSX.Element => {
               <div className="restaurant-list">
                 {room.matchedRestaurants.length ? (
                   room.matchedRestaurants.map((r) => (
+                    <article className={`restaurant-choice ${r.id === room.selectedRestaurantId ? "confirmed" : ""}`} key={r.id}>
                     <a
-                      key={r.id}
                       href={
                         r.placeUrl?.startsWith("https://") ||
                         r.placeUrl?.startsWith("http://")
@@ -553,6 +632,8 @@ export const RoomPage = (): React.JSX.Element => {
                       </div>
                       <ExternalLink size={19} />
                     </a>
+                    <div className="restaurant-choice-actions"><a target="_blank" rel="noreferrer" href={`https://map.kakao.com/link/to/${encodeURIComponent(r.name)},${r.latitude},${r.longitude}`}>길찾기 ↗</a>{member === room.hostId && <button disabled={busy || r.id === room.selectedRestaurantId} onClick={() => perform(async () => setRoom(await post<Room>(`/rooms/${room.roomId}/selection`, { memberId: member, restaurantId: r.id })))}>{r.id === room.selectedRestaurantId ? "확정한 식당" : "여기로 결정"}</button>}</div>
+                    </article>
                   ))
                 ) : (
                   <p>

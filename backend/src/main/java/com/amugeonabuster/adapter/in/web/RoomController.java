@@ -60,6 +60,10 @@ public class RoomController {
             @PathVariable("roomId") String roomId,
             @RequestBody JoinRoomRequest request, HttpSession session
     ) {
+        Object existing = session.getAttribute("room:" + roomId);
+        var current = getRoomUseCase.getRoom(roomId);
+        if (existing != null && current.isPresent() && current.get().getMembers().stream().anyMatch(m -> m.getId().equals(existing)))
+            return ResponseEntity.ok(RoomResponse.fromDomain(current.get()));
         JoinRoomCommand command = new JoinRoomCommand(
                 roomId,
                 request.getGuestNickname()
@@ -118,6 +122,46 @@ public class RoomController {
         return getRoomUseCase.getRoom(roomId)
                 .map(room -> ResponseEntity.ok(RoomResponse.fromDomain(room)))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+    }
+
+    public record RoomSummary(String roomId, String location, int memberCount, String status, java.time.Instant createdAt) {}
+
+    @GetMapping
+    public java.util.List<RoomSummary> listRooms() {
+        return getRoomUseCase.recentRooms().stream().map(r -> new RoomSummary(r.getId(), r.getLocation(),
+                r.getMembers().size(), r.getStatus().name(), r.getCreatedAt())).toList();
+    }
+
+    @GetMapping("/{roomId}/me")
+    public java.util.Map<String, Object> me(@PathVariable String roomId, HttpSession session) {
+        Room room = getRoomUseCase.getRoom(roomId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        Object actor = session.getAttribute("room:" + roomId);
+        if (!(actor instanceof UUID) || room.getMembers().stream().noneMatch(m -> m.getId().equals(actor)))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        return java.util.Map.of("memberId", actor, "room", RoomResponse.fromDomain(room), "swiped",
+                room.getSwipes().stream().filter(s -> s.getMemberId().equals(actor)).map(s -> s.getMenuName()).toList());
+    }
+
+    public record RoomAction(UUID memberId, UUID restaurantId) {}
+
+    @PostMapping("/{roomId}/leave")
+    public ResponseEntity<Void> leave(@PathVariable String roomId, @RequestBody RoomAction request, HttpSession session) {
+        requireMember(session, roomId, request.memberId());
+        getRoomUseCase.leave(roomId, request.memberId());
+        session.removeAttribute("room:" + roomId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{roomId}/close")
+    public RoomResponse close(@PathVariable String roomId, @RequestBody RoomAction request, HttpSession session) {
+        requireMember(session, roomId, request.memberId());
+        return RoomResponse.fromDomain(getRoomUseCase.closeVoting(roomId, request.memberId()));
+    }
+
+    @PostMapping("/{roomId}/selection")
+    public RoomResponse select(@PathVariable String roomId, @RequestBody RoomAction request, HttpSession session) {
+        requireMember(session, roomId, request.memberId());
+        return RoomResponse.fromDomain(getRoomUseCase.selectRestaurant(roomId, request.memberId(), request.restaurantId()));
     }
 
     private void requireMember(HttpSession session, String roomId, UUID memberId) {

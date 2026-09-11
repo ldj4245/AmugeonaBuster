@@ -16,6 +16,12 @@ public class RoomPersistenceAdapter implements SaveRoomPort, LoadRoomPort {
     private final RoomMapper mapper;
 
     @Override
+    public java.util.List<Room> recentRooms() {
+        return repository.findTop50ByCreatedAtAfterOrderByCreatedAtDesc(java.time.Instant.now().minusSeconds(10800))
+                .stream().map(mapper::toDomainModel).filter(r -> !r.getMembers().isEmpty()).toList();
+    }
+
+    @Override
     public void saveRoom(Room room) {
         RoomJpaEntity jpaEntity = mapper.toJpaEntity(room);
         repository.save(jpaEntity);
