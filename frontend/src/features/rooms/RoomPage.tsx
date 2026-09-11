@@ -61,6 +61,9 @@ export const RoomPage = (): React.JSX.Element => {
   const [join, setJoin] = useState(() =>
     new URLSearchParams(window.location.search).has("room"),
   );
+  const [joinByCode, setJoinByCode] = useState(() =>
+    !new URLSearchParams(window.location.search).has("room"),
+  );
   const [code, setCode] = useState(
     () => new URLSearchParams(window.location.search).get("room") || "",
   );
@@ -75,7 +78,6 @@ export const RoomPage = (): React.JSX.Element => {
   const [filter, setFilter] = useState("");
   const [showForm, setShowForm] = useState(() => new URLSearchParams(window.location.search).has("room"));
   const [closing, setClosing] = useState(false);
-  const formRef = useRef<HTMLDivElement>(null);
   const loadRooms = useCallback(async () => {
     try { setRooms(await api<RoomSummary[]>("/rooms")); setListError(""); }
     catch { setListError("방 목록을 불러오지 못했습니다. 다시 시도해 주세요."); }
@@ -175,8 +177,8 @@ export const RoomPage = (): React.JSX.Element => {
   };
   const participate = (id: string) => perform(async () => {
     if (!nickname.trim()) {
-      setCode(id); setJoin(true); setShowForm(true);
-      window.setTimeout(() => formRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }), 0);
+      setCode(id); setJoin(true); setJoinByCode(false); setShowForm(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
     await post<Room>(`/rooms/${id}/members`, { guestNickname: nickname.trim() });
@@ -253,8 +255,8 @@ export const RoomPage = (): React.JSX.Element => {
       <div className="section-heading">
         <div>
           <span className="eyebrow">함께 정하는 점심</span>
-          <h1>메뉴 투표</h1>
-          <p>{room ? "메뉴를 고르고, 오늘 갈 식당까지 정해요." : "동료가 만든 방에 참여하거나 새 방을 만들어 보세요."}</p>
+          <h1>{room ? "메뉴 투표" : showForm ? (join ? "점심방 참여" : "점심방 만들기") : "점심방"}</h1>
+          <p>{room ? "메뉴를 고르고, 오늘 갈 식당까지 정해요." : showForm ? (join ? "이름만 입력하면 바로 참여할 수 있어요." : "장소와 후보 메뉴를 정하면 방이 열려요.") : "같이 먹을 메뉴와 식당을 정해요."}</p>
         </div>
         <Users size={42} strokeWidth={1} />
       </div>
@@ -265,9 +267,9 @@ export const RoomPage = (): React.JSX.Element => {
       )}
       {!room ? (
         <>
-        <div className="room-directory">
-          <div className="directory-heading"><div><h2>함께 먹을 사람</h2><p>최근 3시간의 방 · 최대 10명</p></div>
-            <button className="button primary" onClick={() => { setShowForm(true); setJoin(false); window.setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0); }}>방 만들기 <ArrowRight size={16}/></button>
+        {!showForm ? <div className="room-directory">
+          <div className="directory-heading"><div><span className="directory-kicker">지금 참여할 수 있는 방</span><h2>열려 있는 점심방</h2><p>최근 3시간 안에 만들어진 방이에요.</p></div>
+            <button className="button primary" onClick={() => { setShowForm(true); setJoin(false); setJoinByCode(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}>방 만들기 <ArrowRight size={16}/></button>
           </div>
           <div className="directory-tools"><label><Search size={17}/><input aria-label="방 검색" placeholder="장소 또는 방 코드 검색" value={filter} onChange={e => setFilter(e.target.value)}/></label><button className="icon-button" aria-label="방 목록 새로고침" onClick={loadRooms}><RefreshCw size={17}/></button></div>
           {listError ? <p className="notice" role="alert">{listError}</p> : listLoading ? <p className="directory-empty">방을 불러오는 중…</p> : (
@@ -279,26 +281,12 @@ export const RoomPage = (): React.JSX.Element => {
                 <div className="directory-card-bottom"><span><Users size={16}/>{r.memberCount} / 10명</span><button disabled={busy || r.status !== "LOBBY" || r.memberCount >= 10} onClick={() => participate(r.roomId)}>{r.memberCount >= 10 ? "정원 마감" : r.status === "LOBBY" ? "참여하기" : r.status === "PLAYING" ? "진행 중" : "투표 종료"}<ArrowRight size={15}/></button></div>
               </article>
             ))}
-            {!rooms.some(r => `${r.location} ${r.roomId}`.toLowerCase().includes(filter.toLowerCase())) && <div className="directory-empty"><Users size={30}/><h3>{filter ? "검색한 방이 없습니다" : "아직 만들어진 방이 없습니다"}</h3><p>첫 방을 만들고 동료를 초대해 보세요.</p></div>}
+            {!rooms.some(r => `${r.location} ${r.roomId}`.toLowerCase().includes(filter.toLowerCase())) && <div className="directory-empty"><Users size={30}/><h3>{filter ? "검색한 방이 없습니다" : "아직 열려 있는 방이 없습니다"}</h3><p>새 방을 만들고 동료를 초대해 보세요.</p></div>}
           </div>)}
-          <button className="text-button" onClick={() => { setShowForm(true); setJoin(true); }}>초대 코드로 참여</button>
-        </div>
-        {showForm && <div className="room-setup settings-card" ref={formRef}>
-          <h2>{join ? "방에 참여하기" : "새 점심 모임"}</h2><p className="setup-description">{join ? "동료들이 알아볼 이름을 입력하세요." : "장소와 먹고 싶은 메뉴를 골라주세요. 만든 방은 목록에 공개됩니다."}</p>
-          <div className="meal-tabs">
-            <button
-              className={!join ? "active" : ""}
-              onClick={() => setJoin(false)}
-            >
-              방 만들기
-            </button>
-            <button
-              className={join ? "active" : ""}
-              onClick={() => setJoin(true)}
-            >
-              방 참여
-            </button>
-          </div>
+          <div className="directory-footer"><span>초대받은 코드가 있나요?</span><button className="button secondary" onClick={() => { setShowForm(true); setJoin(true); setJoinByCode(true); setCode(""); window.scrollTo({ top: 0, behavior: "smooth" }); }}>코드로 참여</button></div>
+        </div> : <div className="room-setup settings-card">
+          <button type="button" className="setup-back text-button" onClick={() => { setShowForm(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}>← 방 목록</button>
+          <div className="setup-header"><span className="eyebrow">{join ? "점심방 참여" : "새 점심방"}</span><h2>{join ? "참여하기" : "방 만들기"}</h2><p className="setup-description">{join ? (joinByCode ? "받은 초대 코드를 입력하고 이름만 남겨주세요." : "참여할 방을 확인하고 이름을 입력해 주세요.") : "장소와 후보 메뉴를 정하면 방이 열립니다. 만든 방은 목록에서 바로 보여요."}</p></div>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -316,20 +304,14 @@ export const RoomPage = (): React.JSX.Element => {
               />
             </label>
             {join ? (
-              <label className="field-label">
+              joinByCode ? <label className="field-label">
                 초대 코드
-                <input
-                  required
-                  value={code}
-                  maxLength={20}
-                  onChange={(e) => setCode(e.target.value)}
-                  placeholder="ROOM-ABC123"
-                />
-              </label>
+                <input required value={code} maxLength={20} onChange={(e) => setCode(e.target.value)} placeholder="ROOM-ABC123" />
+              </label> : <div className="join-room-context"><span>참여할 방</span><strong>{code}</strong><button type="button" className="text-button" onClick={() => { setJoinByCode(true); setCode(""); }}>다른 코드로 참여</button></div>
             ) : (
               <>
                 <div className="field-label location-field" role="group" aria-labelledby="location-label">
-                  <span id="location-label">약속 위치</span>
+                  <span id="location-label">약속 장소</span>
                   <div className="location-input-row">
                     <div className="location-input-wrap">
                       <Search size={16} aria-hidden="true" />
@@ -439,7 +421,7 @@ export const RoomPage = (): React.JSX.Element => {
                 (!join && (!location.trim() || !selected.length))
               }
             >
-              {busy ? "준비 중…" : join ? "방 참여하기" : "함께 고를 방 만들기"}
+              {busy ? "준비 중…" : join ? "이 방에 참여하기" : "방 만들기"}
               <ArrowRight size={17} />
             </button>
           </form>

@@ -1914,13 +1914,14 @@ textarea {
 .rooms-page .section-heading { margin-bottom: 30px; }
 .rooms-page .section-heading .eyebrow { color: #63786c; letter-spacing: .04em; }
 .room-directory { background: #fff; padding: 30px; border: 1px solid #e1e6e2; border-radius: 18px; }
+.directory-kicker { display: block; color: #617568; font-size: 11px; font-weight: 700; letter-spacing: .04em; margin-bottom: 8px; }
 .directory-heading, .directory-tools, .directory-card-top, .directory-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .directory-heading h2 { font-size: 24px; letter-spacing: -.8px; }
 .directory-heading p, .setup-description { color: #7a8380; font-size: 13px; margin: 8px 0 0; line-height: 1.7; }
 .directory-tools { margin: 26px 0 20px; }
 .directory-tools label { display: flex; align-items: center; gap: 10px; flex: 1; background: #f5f7f5; border-radius: 10px; padding: 0 14px; }
 .directory-tools input { border: 0; background: transparent; width: 100%; min-width: 0; }
-.room-directory-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.room-directory-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,440px),1fr)); gap: 16px; }
 .directory-card { border: 1px solid #e1e7e2; padding: 22px; border-radius: 12px; }
 .directory-card-top small, .directory-card > p { color: #8a928d; font-size: 11px; }
 .room-status { background: #edf3ed; color: #41614b; border-radius: 5px; font-size: 11px; padding: 5px 8px; font-weight: 600; }
@@ -1936,9 +1937,19 @@ textarea {
 .directory-empty svg { margin: 0 auto 16px; }
 .directory-empty h3 { color: #434e46; font-size: 18px; margin-bottom: 9px; }
 .directory-empty p { font-size: 13px; }
-.room-directory > .text-button { margin-top: 22px; }
-.rooms-page .room-setup { margin: 28px 0; max-width: none; border-radius: 18px; padding: 30px; scroll-margin-top: 24px; }
+.directory-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 24px; padding-top: 20px; border-top: 1px solid #eef0ed; color: #7a8380; font-size: 12px; }
+.directory-footer .button { min-height: 42px; padding-inline: 17px; }
+.rooms-page .room-setup { margin: 28px auto; max-width: 800px; border-radius: 18px; padding: 30px; scroll-margin-top: 24px; }
 .rooms-page .room-setup h2 { font-size: 24px; }
+.rooms-page .room-setup { position: relative; }
+.setup-back { display: inline-flex; align-items: center; min-height: 36px; margin-bottom: 24px; color: #6f7d74; }
+.setup-header { max-width: 620px; margin-bottom: 26px; }
+.setup-header .eyebrow { color: #617568; }
+.setup-header h2 { margin-top: 8px; }
+.join-room-context { display: flex; align-items: center; gap: 12px; min-height: 66px; margin: 8px 0 24px; padding: 14px 16px; border: 1px solid #e1e7e2; border-radius: 10px; background: #f7f9f6; }
+.join-room-context span { color: #7a8380; font-size: 12px; }
+.join-room-context strong { color: #304a37; font-size: 16px; letter-spacing: .06em; }
+.join-room-context .text-button { margin-left: auto; font-size: 11px; }
 .rooms-page .meal-tabs { margin-top: 24px; }
 .rooms-page .menu-options button { border-radius: 22px; padding: 10px 16px; min-height: 44px; }
 .rooms-page .menu-options button.selected { background: #eaf0e9; border-color: #a3b39e; color: #34503a; }
@@ -1961,10 +1972,15 @@ textarea {
 .selected-restaurant .text-button { margin: auto; }
 @media(max-width:600px) {
   .room-directory, .rooms-page .room-setup { padding: 20px; }
-  .directory-heading { align-items: flex-start; }
+  .directory-heading { align-items: flex-start; flex-direction: column; }
   .directory-heading h2 { font-size: 20px; }
-  .directory-heading .button { padding-inline: 12px; white-space: nowrap; }
+  .directory-heading .button { width: 100%; justify-content: center; padding-inline: 12px; white-space: nowrap; }
   .room-directory-grid { grid-template-columns: minmax(0,1fr); }
+  .directory-footer { align-items: stretch; flex-direction: column; gap: 10px; }
+  .directory-footer .button { width: 100%; justify-content: center; }
+  .join-room-context { align-items: flex-start; flex-wrap: wrap; }
+  .join-room-context .text-button { flex-basis: 100%; margin-left: 0; text-align: left; }
+  .rooms-page .room-setup form > .button.wide { position: sticky; bottom: 12px; z-index: 3; box-shadow: 0 8px 20px rgba(30, 42, 34, .16); }
   .rooms-page .lobby, .rooms-page .voting { padding: 24px 18px; }
   .rooms-page .vote-buttons { gap: 10px; }
   .rooms-page .vote-buttons .button { flex: 1; padding-inline: 10px; }
