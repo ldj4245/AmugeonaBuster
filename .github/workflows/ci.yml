@@ -1,5 +1,6 @@
-name: Build and test
+name: 검사 및 Heroku 배포
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches: [main]
@@ -21,3 +22,56 @@ jobs:
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
       - run: bash gradlew build --no-daemon
+
+  deploy:
+    name: Heroku 운영 배포
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: heroku-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: 최신 main 확인
+        id: latest
+        shell: bash
+        run: |
+          latest_sha=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$latest_sha" = "$GITHUB_SHA" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "새 main 커밋이 있어 이전 커밋의 배포를 건너뜁니다."
+          fi
+      - name: Heroku 배포
+        if: steps.latest.outputs.deploy == 'true'
+        shell: bash
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+          GIT_TERMINAL_PROMPT: '0'
+        run: |
+          if [ -z "$HEROKU_API_KEY" ]; then
+            echo '::error::GitHub 저장소에 HEROKU_API_KEY Secret을 등록해 주세요.'
+            exit 1
+          fi
+          umask 077
+          askpass="$RUNNER_TEMP/heroku-askpass.sh"
+          trap 'rm -f "$askpass"' EXIT
+          cat > "$askpass" <<'SCRIPT'
+          #!/usr/bin/env bash
+          case "$1" in
+            *Username*) printf '%s\n' 'heroku' ;;
+            *Password*) printf '%s\n' "$HEROKU_API_KEY" ;;
+          esac
+          SCRIPT
+          chmod 700 "$askpass"
+          GIT_ASKPASS="$askpass" git -c credential.helper= push --force https://git.heroku.com/amugeona-buster.git HEAD:refs/heads/main
+      - name: 운영 응답 확인
+        if: steps.latest.outputs.deploy == 'true'
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --retry 10 --retry-delay 5 --retry-all-errors --max-time 20 \
+            https://amugeona-buster-6eda848df67d.herokuapp.com/api/rooms > /dev/null
