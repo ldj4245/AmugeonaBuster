@@ -27,11 +27,21 @@ public class WelstoryMenuService implements GetTodayMenuQuery {
 
     @Override
     public WelstoryMenuResult getMenu(String cotNo, String hallNo, String cafeteriaName, java.time.LocalDate date) {
+        validateDate(date);
+        return loadWelstoryMenuPort.loadMenu(cotNo, hallNo, cafeteriaName, date);
+    }
+
+    @Override
+    public WelstoryMenuResult refreshMenu(String cotNo, String hallNo, String cafeteriaName, java.time.LocalDate date) {
+        validateDate(date);
+        return loadWelstoryMenuPort.loadMenu(cotNo, hallNo, cafeteriaName, date, true);
+    }
+
+    private void validateDate(java.time.LocalDate date) {
         var today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
         if (date.isBefore(today.minusDays(35)) || date.isAfter(today.plusDays(35))) {
             throw new IllegalArgumentException("식단은 오늘 기준 5주 이내 날짜만 조회할 수 있습니다.");
         }
-        return loadWelstoryMenuPort.loadMenu(cotNo, hallNo, cafeteriaName, date);
     }
 
     /**

@@ -159,12 +159,18 @@ public class WelstoryAlertController {
 
     @GetMapping("/menu-details")
     public WelstoryMenuResult menu(@RequestParam("cotNo") String cotNo, @RequestParam("hallNo") String hallNo,
-            @RequestParam(value = "date", required = false) String date) {
+            @RequestParam(value = "date", required = false) String date,
+            @RequestParam(value = "refresh", defaultValue = "false") boolean refresh) {
         var preset = cafeterias().stream().filter(c -> c.cotNo().equals(cotNo) && c.hallNo().equals(hallNo))
                 .findFirst().orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "지원하지 않는 식당입니다."));
-        if (date == null) return menuQuery.getTodayMenu(cotNo, hallNo, preset.name());
+        if (date == null) {
+            return refresh ? menuQuery.refreshMenu(cotNo, hallNo, preset.name(), java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")))
+                    : menuQuery.getTodayMenu(cotNo, hallNo, preset.name());
+        }
         try {
-            return menuQuery.getMenu(cotNo, hallNo, preset.name(), java.time.LocalDate.parse(date));
+            var parsedDate = java.time.LocalDate.parse(date);
+            return refresh ? menuQuery.refreshMenu(cotNo, hallNo, preset.name(), parsedDate)
+                    : menuQuery.getMenu(cotNo, hallNo, preset.name(), parsedDate);
         } catch (java.time.format.DateTimeParseException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "날짜 형식이 올바르지 않습니다.");
         }
