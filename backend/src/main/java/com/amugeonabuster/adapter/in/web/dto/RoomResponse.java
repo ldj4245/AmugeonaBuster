@@ -17,6 +17,8 @@ import java.util.stream.Collectors;
 public class RoomResponse {
     private final String roomId;
     private final UUID hostId;
+    private final java.time.Instant createdAt;
+    private final UUID selectedRestaurantId;
     private final String location;
     private final String locationAddress;
     private final String locationPlaceId;
@@ -95,6 +97,8 @@ public class RoomResponse {
         return RoomResponse.builder()
                 .roomId(room.getId())
                 .hostId(room.getHostId())
+                .createdAt(room.getCreatedAt())
+                .selectedRestaurantId(room.getSelectedRestaurantId())
                 .location(room.getLocation())
                 .locationAddress(room.getLocationAddress())
                 .locationPlaceId(room.getLocationPlaceId())

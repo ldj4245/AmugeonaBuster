@@ -5,6 +5,8 @@ import SockJS from 'sockjs-client';
 export interface WebSocketRoomResponse {
   roomId: string;
   hostId: string;
+  createdAt?: string;
+  selectedRestaurantId?: string;
   location: string;
   locationAddress?: string;
   locationPlaceId?: string;

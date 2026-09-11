@@ -61,9 +61,41 @@ class RoomFlowTest {
         assertThat(json.readTree(result.getResponse().getContentAsString()).path("defaultMenus").size()).isEqualTo(2);
     }
 
+    @Test
+    void directoryResumeHostTransferAndSelection() throws Exception {
+        var restaurant = com.amugeonabuster.domain.model.Restaurant.builder().name("돈카츠집")
+                .address("수원").latitude(37.25).longitude(127.05).build();
+        when(restaurants.recommend(anyString(), anyString())).thenReturn(List.of(restaurant));
+        var host = new MockHttpSession();
+        var guest = new MockHttpSession();
+        JsonNode created = postJson("/api/rooms", host,
+                "{\"hostNickname\":\"방장\",\"location\":\"망포역\",\"customMenus\":[\"돈카츠\",\"라멘\"]}", 201);
+        String id = created.path("roomId").asText();
+        String hostId = created.path("hostId").asText();
+        mvc.perform(get("/api/rooms")).andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.roomId == '" + id + "')].memberCount").value(org.hamcrest.Matchers.hasItem(1)));
+        JsonNode joined = postJson("/api/rooms/" + id + "/members", guest, "{\"guestNickname\":\"동료\"}", 200);
+        String guestId = joined.path("members").get(1).path("id").asText();
+        assertThat(postJson("/api/rooms/" + id + "/members", guest, "{\"guestNickname\":\"동료\"}", 200).path("members").size()).isEqualTo(2);
+        mvc.perform(get("/api/rooms/" + id + "/me")).andExpect(status().isForbidden());
+        postJson("/api/rooms/" + id + "/start", host, "{\"hostId\":\"" + hostId + "\"}", 200);
+        postJson("/api/rooms/" + id + "/swipes", guest, json.writeValueAsString(java.util.Map.of("memberId", guestId, "menuName", "돈카츠", "isLike", true)), 200);
+        mvc.perform(get("/api/rooms/" + id + "/me").session(guest)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.swiped[0]").value("돈카츠"));
+        postJson("/api/rooms/" + id + "/close", guest, "{\"memberId\":\"" + guestId + "\"}", 400);
+        mvc.perform(post("/api/rooms/" + id + "/leave").session(host).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"memberId\":\"" + hostId + "\"}")).andExpect(status().isNoContent());
+        JsonNode result = postJson("/api/rooms/" + id + "/close", guest, "{\"memberId\":\"" + guestId + "\"}", 200);
+        assertThat(result.path("hostId").asText()).isEqualTo(guestId);
+        assertThat(result.path("winningMenu").asText()).isEqualTo("돈카츠");
+        postJson("/api/rooms/" + id + "/selection", guest, json.writeValueAsString(java.util.Map.of("memberId", guestId, "restaurantId", restaurant.getId())), 200);
+        mvc.perform(get("/api/rooms/" + id)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.selectedRestaurantId").value(restaurant.getId().toString()));
+    }
+
     private JsonNode postJson(String path, MockHttpSession session, String body, int statusCode) throws Exception {
         var result = mvc.perform(post(path).session(session).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().is(statusCode)).andReturn();
-        return json.readTree(result.getResponse().getContentAsString());
+        return json.readTree(result.getResponse().getContentAsByteArray());
     }
 }

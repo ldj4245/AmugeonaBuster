@@ -6,4 +6,5 @@ import java.util.Optional;
 
 public interface LoadRoomPort {
     Optional<Room> loadRoom(String roomId);
+    default java.util.List<Room> recentRooms() { return java.util.List.of(); }
 }

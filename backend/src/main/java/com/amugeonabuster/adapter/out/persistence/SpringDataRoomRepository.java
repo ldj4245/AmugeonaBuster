@@ -8,6 +8,8 @@ import java.util.Optional;
 
 @Repository
 public interface SpringDataRoomRepository extends JpaRepository<RoomJpaEntity, String> {
+    java.util.List<RoomJpaEntity> findTop50ByCreatedAtAfterOrderByCreatedAtDesc(java.time.Instant since);
+
     @Override
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<RoomJpaEntity> findById(String id);

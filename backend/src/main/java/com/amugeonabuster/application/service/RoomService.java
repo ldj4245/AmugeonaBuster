@@ -50,6 +50,7 @@ public class RoomService implements CreateRoomUseCase, GetRoomUseCase, JoinRoomU
         Room room = Room.builder()
                 .id(roomId)
                 .hostId(hostId)
+                .createdAt(java.time.Instant.now())
                 .location(command.getLocation())
                 .locationAddress(command.getLocationAddress())
                 .locationPlaceId(command.getLocationPlaceId())
@@ -126,6 +127,52 @@ public class RoomService implements CreateRoomUseCase, GetRoomUseCase, JoinRoomU
         saveRoomPort.saveRoom(room);
 
         return room;
+    }
+
+    @Override
+    public List<Room> recentRooms() { return loadRoomPort.recentRooms(); }
+
+    private Room requireRoom(String id) {
+        Room room = loadRoomPort.loadRoom(id).orElseThrow(() -> new IllegalArgumentException("방을 찾을 수 없습니다."));
+        if (room.isExpired()) throw new IllegalArgumentException("만료된 방입니다.");
+        return room;
+    }
+
+    private Room publish(Room room) {
+        broadcastRoomStatePort.broadcastRoomState(room);
+        saveRoomPort.saveRoom(room);
+        return room;
+    }
+
+    @Override
+    public Room leave(String id, UUID actor) {
+        Room room = loadRoomPort.loadRoom(id).orElseThrow(() -> new IllegalArgumentException("방을 찾을 수 없습니다."));
+        room.leave(actor);
+        if (!room.isExpired() && room.getStatus() == com.amugeonabuster.domain.model.RoomStatus.PLAYING && room.isAllMembersCompletedSwiping()) finishVoting(room);
+        return publish(room);
+    }
+
+    private void finishVoting(Room room) {
+        room.determineWinningMenu();
+        room.associateMatchedRestaurants(room.hasLocationCoordinates()
+            ? recommendRestaurantsPort.recommend(room.getWinningMenu(), room.getLocation(), room.getLatitude(), room.getLongitude())
+            : recommendRestaurantsPort.recommend(room.getWinningMenu(), room.getLocation()));
+    }
+
+    @Override
+    public Room closeVoting(String id, UUID actor) {
+        Room room = requireRoom(id);
+        if (!room.getHostId().equals(actor)) throw new IllegalArgumentException("방장만 투표를 마감할 수 있습니다.");
+        if (room.getSwipes().isEmpty()) throw new IllegalArgumentException("한 표 이상 모인 뒤 마감해 주세요.");
+        finishVoting(room);
+        return publish(room);
+    }
+
+    @Override
+    public Room selectRestaurant(String id, UUID actor, UUID restaurantId) {
+        Room room = requireRoom(id);
+        room.selectRestaurant(actor, restaurantId);
+        return publish(room);
     }
 
     @Override

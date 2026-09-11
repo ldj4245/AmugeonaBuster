@@ -1911,6 +1911,64 @@ textarea {
   }
 }
 
+.rooms-page .section-heading { margin-bottom: 30px; }
+.rooms-page .section-heading .eyebrow { color: #63786c; letter-spacing: .04em; }
+.room-directory { background: #fff; padding: 30px; border: 1px solid #e1e6e2; border-radius: 18px; }
+.directory-heading, .directory-tools, .directory-card-top, .directory-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.directory-heading h2 { font-size: 24px; letter-spacing: -.8px; }
+.directory-heading p, .setup-description { color: #7a8380; font-size: 13px; margin: 8px 0 0; line-height: 1.7; }
+.directory-tools { margin: 26px 0 20px; }
+.directory-tools label { display: flex; align-items: center; gap: 10px; flex: 1; background: #f5f7f5; border-radius: 10px; padding: 0 14px; }
+.directory-tools input { border: 0; background: transparent; width: 100%; min-width: 0; }
+.room-directory-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.directory-card { border: 1px solid #e1e7e2; padding: 22px; border-radius: 12px; }
+.directory-card-top small, .directory-card > p { color: #8a928d; font-size: 11px; }
+.room-status { background: #edf3ed; color: #41614b; border-radius: 5px; font-size: 11px; padding: 5px 8px; font-weight: 600; }
+.room-status.playing { background: #f7f0df; color: #876d39; }
+.room-status.completed { background: #f0f1f2; color: #82878c; }
+.directory-card h3 { display: flex; align-items: flex-start; gap: 8px; font-size: 19px; margin: 23px 0 8px; overflow-wrap: anywhere; }
+.directory-card h3 svg { flex-shrink: 0; margin-top: 3px; }
+.directory-card-bottom { border-top: 1px solid #eef0ed; margin-top: 22px; padding-top: 16px; font-size: 12px; }
+.directory-card-bottom span, .directory-card-bottom button { display: inline-flex; align-items: center; gap: 7px; }
+.directory-card-bottom button { color: #35553e; font-weight: 600; min-height: 44px; }
+.directory-card-bottom button:disabled { color: #969d98; }
+.directory-empty { grid-column: 1/-1; text-align: center; padding: 45px 16px; color: #828b84; }
+.directory-empty svg { margin: 0 auto 16px; }
+.directory-empty h3 { color: #434e46; font-size: 18px; margin-bottom: 9px; }
+.directory-empty p { font-size: 13px; }
+.room-directory > .text-button { margin-top: 22px; }
+.rooms-page .room-setup { margin: 28px 0; max-width: none; border-radius: 18px; padding: 30px; scroll-margin-top: 24px; }
+.rooms-page .room-setup h2 { font-size: 24px; }
+.rooms-page .meal-tabs { margin-top: 24px; }
+.rooms-page .menu-options button { border-radius: 22px; padding: 10px 16px; min-height: 44px; }
+.rooms-page .menu-options button.selected { background: #eaf0e9; border-color: #a3b39e; color: #34503a; }
+.rooms-page .lobby, .rooms-page .voting { border-radius: 18px; padding: 38px; background: #fff; }
+.rooms-page .invite-code { color: #374f3d; background: #f3f6f0; border-radius: 10px; }
+.vote-progress { width: 100%; height: 5px; accent-color: #536d4c; margin-bottom: 30px; }
+.rooms-page .voting h2 { margin: 40px 0; font-size: clamp(32px,6vw,56px); color: #324a37; }
+.close-voting { border-top: 1px solid #e6eae4; margin-top: 30px; padding-top: 20px; }
+.close-voting p { font-size: 13px; line-height: 1.7; margin-bottom: 14px; }
+.close-voting .text-button { margin: 12px auto 0; }
+.restaurant-choice { text-align: left; background: #fff; border: 1px solid #e1e7df; border-radius: 12px; padding: 22px; }
+.restaurant-choice > a { display: flex; justify-content: space-between; gap: 15px; }
+.restaurant-choice > a > svg { flex-shrink: 0; }
+.restaurant-choice-actions { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #edf0eb; margin-top: 20px; padding-top: 12px; gap: 12px; font-size: 12px; }
+.restaurant-choice-actions button { min-height: 44px; padding: 8px 16px; background: #edf2e9; color: #3f5943; border-radius: 7px; font-weight: 600; }
+.restaurant-choice.confirmed { border-color: #658164; }
+.selected-restaurant { max-width: 650px; margin: 24px auto; background: #edf2e9; border-radius: 12px; padding: 26px; }
+.selected-restaurant > span { font-size: 12px; color: #657561; }
+.selected-restaurant h3 { margin: 12px 0; font-size: 24px; }
+.selected-restaurant .text-button { margin: auto; }
+@media(max-width:600px) {
+  .room-directory, .rooms-page .room-setup { padding: 20px; }
+  .directory-heading { align-items: flex-start; }
+  .directory-heading h2 { font-size: 20px; }
+  .directory-heading .button { padding-inline: 12px; white-space: nowrap; }
+  .room-directory-grid { grid-template-columns: minmax(0,1fr); }
+  .rooms-page .lobby, .rooms-page .voting { padding: 24px 18px; }
+  .rooms-page .vote-buttons { gap: 10px; }
+  .rooms-page .vote-buttons .button { flex: 1; padding-inline: 10px; }
+}
 .location-field {
   position: relative;
 }
