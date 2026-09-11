@@ -73,6 +73,14 @@ export const MealPage = ({
   const [reload, setReload] = useState(0);
   const [review, setReview] = useState<Course | null>(null);
   const cafeteria = cafeterias[place];
+  const changeDate = (nextDate: string) => {
+    setDate(nextDate);
+    setReload(0);
+  };
+  const changePlace = (nextPlace: number) => {
+    setPlace(nextPlace);
+    setReload(0);
+  };
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
@@ -81,8 +89,10 @@ export const MealPage = ({
     setReview(null);
     setStats({});
     saveLocal("club-cafeteria", place);
+    const menuParams = new URLSearchParams({ cotNo: cafeteria.cotNo, hallNo: cafeteria.hallNo, date });
+    if (reload > 0) menuParams.set("refresh", "true");
     api<Meal>(
-      `/welstory/menu-details?${new URLSearchParams({ cotNo: cafeteria.cotNo, hallNo: cafeteria.hallNo, date })}`,
+      `/welstory/menu-details?${menuParams}`,
       { signal: controller.signal },
     )
       .then(setMeal)
@@ -119,7 +129,7 @@ export const MealPage = ({
           <select
             aria-label="구내식당"
             value={place}
-            onChange={(e) => setPlace(Number(e.target.value))}
+            onChange={(e) => changePlace(Number(e.target.value))}
           >
             {cafeterias.map((c, i) => (
               <option value={i} key={c.cotNo}>
@@ -137,19 +147,19 @@ export const MealPage = ({
               <button
                 aria-label="이전 주"
                 disabled={weekStart <= shiftDate(today, -28)}
-                onClick={() => setDate(shiftDate(date, -7))}
+                onClick={() => changeDate(shiftDate(date, -7))}
               >
                 <ChevronLeft size={18} />
               </button>
               <button
                 aria-label="다음 주"
                 disabled={weekStart >= shiftDate(today, 21)}
-                onClick={() => setDate(shiftDate(date, 7))}
+                onClick={() => changeDate(shiftDate(date, 7))}
               >
                 <ChevronRight size={18} />
               </button>
             </div>
-            <button className="today-button" onClick={() => setDate(today)}>
+            <button className="today-button" onClick={() => changeDate(today)}>
               오늘
             </button>
           </div>
@@ -159,7 +169,7 @@ export const MealPage = ({
                 key={d}
                 className={d === date ? "active" : ""}
                 aria-pressed={d === date}
-                onClick={() => setDate(d)}
+                onClick={() => changeDate(d)}
               >
                 <span className="weekday">
                   {["월", "화", "수", "목", "금", "토", "일"][i]}
