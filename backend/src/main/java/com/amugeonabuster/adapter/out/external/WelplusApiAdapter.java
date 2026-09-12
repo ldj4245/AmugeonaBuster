@@ -35,8 +35,11 @@ public class WelplusApiAdapter implements LoadWelstoryMenuPort {
     private volatile long tokenExpiryTime;
     private static final String DEVICE_ID = UUID.randomUUID().toString();
     private static final long MENU_CACHE_TTL_MILLIS = Duration.ofMinutes(10).toMillis();
+    private static final long AVAILABLE_STALE_TTL_MILLIS = Duration.ofHours(6).toMillis();
     private static final long EMPTY_CACHE_TTL_MILLIS = Duration.ofMinutes(2).toMillis();
     private static final long UNAVAILABLE_CACHE_TTL_MILLIS = Duration.ofSeconds(30).toMillis();
+    private static final long FALLBACK_TOKEN_TTL_MILLIS = Duration.ofMinutes(8).toMillis();
+    private static final long TOKEN_EXPIRY_SAFETY_MILLIS = Duration.ofSeconds(30).toMillis();
     private final Map<MenuCacheKey, CachedMenu> menuCache = new ConcurrentHashMap<>();
     private final Map<MenuCacheKey, CompletableFuture<WelstoryMenuResult>> inFlight = new ConcurrentHashMap<>();
     private final ExecutorService requestExecutor;
@@ -79,14 +82,14 @@ public class WelplusApiAdapter implements LoadWelstoryMenuPort {
             boolean forceRefresh) {
         MenuCacheKey cacheKey = new MenuCacheKey(cotNo, hallNo, today);
         if (forceRefresh) {
-            menuCache.remove(cacheKey);
+            log.debug("Bypassing Welstory menu cache for {} {}", cotNo, today);
         } else {
             CachedMenu cached = menuCache.get(cacheKey);
             if (cached != null && cached.isFresh()) {
                 log.debug("Returning cached Welstory menu for {} {}", cotNo, today);
                 return cached.result();
             }
-            if (cached != null) {
+            if (cached != null && !cached.canFallback()) {
                 menuCache.remove(cacheKey, cached);
             }
         }
@@ -97,15 +100,28 @@ public class WelplusApiAdapter implements LoadWelstoryMenuPort {
             created.whenComplete((result, error) -> {
                 inFlight.remove(key, created);
                 if (error == null && result != null) {
-                    menuCache.put(key, new CachedMenu(result,
-                            System.currentTimeMillis() + cacheTtlFor(result)));
+                    long now = System.currentTimeMillis();
+                    long cacheTtl = cacheTtlFor(result);
+                    CachedMenu updated = new CachedMenu(result, now + cacheTtl,
+                            isAvailable(result) ? now + AVAILABLE_STALE_TTL_MILLIS : now + cacheTtl);
+                    menuCache.compute(key, (ignored, current) ->
+                            "UNAVAILABLE".equals(result.getStatus()) && current != null && current.canFallback()
+                                    ? current : updated);
                 }
             });
             return created;
         });
 
         try {
-            return request.join();
+            WelstoryMenuResult result = request.join();
+            if ("UNAVAILABLE".equals(result.getStatus())) {
+                CachedMenu fallback = menuCache.get(cacheKey);
+                if (fallback != null && fallback.canFallback()) {
+                    log.warn("Serving the most recent Welstory menu after an upstream failure for {} {}", cotNo, today);
+                    return fallback.result();
+                }
+            }
+            return result;
         } catch (CompletionException e) {
             log.warn("Welstory menu request failed ({}).", e.getCause() == null ? e.getMessage() : e.getCause().getMessage());
             String dayKorean = today.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.KOREAN);
@@ -118,6 +134,11 @@ public class WelplusApiAdapter implements LoadWelstoryMenuPort {
         if ("UNAVAILABLE".equals(result.getStatus())) return UNAVAILABLE_CACHE_TTL_MILLIS;
         if ("EMPTY".equals(result.getStatus()) || "PARTIAL".equals(result.getStatus())) return EMPTY_CACHE_TTL_MILLIS;
         return MENU_CACHE_TTL_MILLIS;
+    }
+
+    private boolean isAvailable(WelstoryMenuResult result) {
+        return "AVAILABLE".equals(result.getStatus())
+                && result.getCourses() != null && !result.getCourses().isEmpty();
     }
 
     private WelstoryMenuResult fetchMenu(String cotNo, String hallNo, String cafeteriaName, LocalDate today) {
@@ -177,9 +198,13 @@ public class WelplusApiAdapter implements LoadWelstoryMenuPort {
 
     private record MenuCacheKey(String cotNo, String hallNo, LocalDate date) {}
 
-    private record CachedMenu(WelstoryMenuResult result, long expiresAt) {
+    private record CachedMenu(WelstoryMenuResult result, long expiresAt, long staleUntil) {
         private boolean isFresh() {
             return expiresAt > System.currentTimeMillis();
+        }
+
+        private boolean canFallback() {
+            return staleUntil > System.currentTimeMillis();
         }
     }
 
@@ -224,7 +249,7 @@ public class WelplusApiAdapter implements LoadWelstoryMenuPort {
                 String authHeader = response.getHeaders().getFirst("Authorization");
                 if (authHeader != null && !authHeader.isEmpty()) {
                     cachedToken = authHeader;
-                    tokenExpiryTime = System.currentTimeMillis() + (2 * 60 * 60 * 1000); // 2 hours
+                    tokenExpiryTime = resolveTokenExpiry(authHeader);
                     log.info("Successfully fetched and cached Welstory Plus JWT token.");
                     return cachedToken;
                 }
@@ -234,6 +259,22 @@ public class WelplusApiAdapter implements LoadWelstoryMenuPort {
             log.error("Error logging in to Welstory Plus: {}", e.getMessage(), e);
         }
         return null;
+    }
+
+    long resolveTokenExpiry(String authorizationHeader) {
+        long fallback = System.currentTimeMillis() + FALLBACK_TOKEN_TTL_MILLIS;
+        try {
+            String jwt = authorizationHeader.replaceFirst("(?i)^Bearer\\s+", "");
+            String[] parts = jwt.split("\\.");
+            if (parts.length != 3) return fallback;
+            JsonNode claims = objectMapper.readTree(Base64.getUrlDecoder().decode(parts[1]));
+            long expiresAt = claims.path("exp").asLong(0) * 1000;
+            if (expiresAt <= System.currentTimeMillis()) return fallback;
+            return expiresAt - TOKEN_EXPIRY_SAFETY_MILLIS;
+        } catch (RuntimeException | java.io.IOException e) {
+            log.debug("Could not read Welstory token expiry. Using the fallback TTL.");
+            return fallback;
+        }
     }
 
     private synchronized String refreshToken(String failedToken) {
@@ -331,12 +372,14 @@ public class WelplusApiAdapter implements LoadWelstoryMenuPort {
         JsonNode rootNode = objectMapper.readTree(body);
 
         if (!rootNode.has("data") || rootNode.get("data").isNull()) {
-            return null;
+            return retryAfterInvalidSession(restaurantCode, dateStr, mealTimeId, token, isRetry,
+                    "data가 없는 응답");
         }
 
         JsonNode dataNode = rootNode.get("data");
         if (!dataNode.has("mealList") || !dataNode.get("mealList").isArray()) {
-            return null;
+            return retryAfterInvalidSession(restaurantCode, dateStr, mealTimeId, token, isRetry,
+                    "mealList가 없는 응답");
         }
 
         JsonNode mealList = dataNode.get("mealList");
@@ -414,6 +457,19 @@ public class WelplusApiAdapter implements LoadWelstoryMenuPort {
         }
 
         return menus;
+    }
+
+    private List<CourseMenu> retryAfterInvalidSession(String restaurantCode, String dateStr, String mealTimeId,
+            String token, boolean isRetry, String reason) throws Exception {
+        if (!isRetry) {
+            log.warn("Welstory returned {} for meal type {}. Refreshing authentication once.", reason, mealTimeId);
+            String newToken = refreshToken(token);
+            if (newToken != null) {
+                return executeFetchMenus(restaurantCode, dateStr, mealTimeId, newToken, true);
+            }
+        }
+        log.error("Welstory returned {} for meal type {} after authentication refresh.", reason, mealTimeId);
+        return null;
     }
 
 }
