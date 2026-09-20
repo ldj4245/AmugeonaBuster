@@ -328,11 +328,12 @@ export const MealPage = ({
           <section className="aside-section">
             <div className="aside-heading">
               <h3>게임</h3>
-              <span>전체 5</span>
+              <span>전체 6</span>
             </div>
             <div className="shortcuts">
               {[
                 "주사위 2개",
+                "핀볼 한 판",
                 "5초 맞추기",
                 "반응속도 대결",
                 "지뢰 피하기",

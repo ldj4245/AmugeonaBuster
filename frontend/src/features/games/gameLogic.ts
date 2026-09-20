@@ -1,4 +1,10 @@
-export type GameId = "dice" | "reaction" | "timer" | "beans" | "draw";
+export type GameId =
+  | "dice"
+  | "pinball"
+  | "reaction"
+  | "timer"
+  | "beans"
+  | "draw";
 export interface Score {
   name: string;
   value: number;
@@ -19,6 +25,16 @@ export const games = [
     type: "주사위",
     color: "neutral",
     mark: "⚄",
+  },
+  {
+    id: "pinball",
+    title: "핀볼 한 판",
+    label: "핀볼",
+    description: "공을 떨어뜨려 도착한 칸의 한 명을 정합니다.",
+    duration: "10초",
+    type: "운",
+    color: "sky",
+    mark: "●",
   },
   {
     id: "reaction",
