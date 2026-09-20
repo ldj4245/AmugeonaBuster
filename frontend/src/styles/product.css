@@ -766,6 +766,58 @@ p {
   background: #303f56;
   color: white;
 }
+.pinball-card-art {
+  width: 106px;
+  height: 105px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d7deea;
+  border-radius: 14px;
+  background: #f3f6fa;
+  overflow: hidden;
+}
+.pinball-card-art > i {
+  position: absolute;
+  z-index: 2;
+  top: 14px;
+  left: 47px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #2e405b;
+  box-shadow: inset -2px -2px 0 rgba(255, 255, 255, 0.22);
+}
+.pinball-card-art > span {
+  display: grid;
+  grid-template-columns: repeat(4, 6px);
+  gap: 12px 15px;
+  margin-top: 8px;
+}
+.pinball-card-art b {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #aeb9ca;
+  box-shadow: 0 1px 0 #fff;
+}
+.pinball-card-art > em {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 8px;
+  height: 18px;
+  border: 1px solid #bfc9d8;
+  border-top: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0,
+    transparent 19px,
+    #bfc9d8 19px,
+    #bfc9d8 20px
+  );
+}
 .reflex-art {
   width: 105px;
   height: 60px;
@@ -1666,6 +1718,80 @@ p {
 .dice-game .score-list {
   margin-top: 20px;
 }
+.pinball-game {
+  width: min(100%, 460px);
+  margin: 0 auto;
+}
+.pinball-board {
+  width: min(100%, 390px);
+  margin: 18px auto 16px;
+  filter: drop-shadow(0 14px 22px rgba(42, 54, 73, 0.09));
+}
+.pinball-board svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.pinball-board-bg {
+  fill: #f4f6f9;
+  stroke: #d9dfe8;
+  stroke-width: 2;
+}
+.pinball-funnel {
+  fill: none;
+  stroke: #aeb9c8;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pinball-peg circle:first-child {
+  fill: #c4ccd8;
+  stroke: #9eabba;
+  stroke-width: 1;
+}
+.pinball-peg circle:last-child {
+  fill: rgba(255, 255, 255, 0.82);
+}
+.pinball-lane rect {
+  fill: #e7ebf1;
+  stroke: #c7cfdb;
+  stroke-width: 1;
+  transition: fill 0.2s, stroke 0.2s;
+}
+.pinball-lane text {
+  fill: #596577;
+  font-size: 11px;
+  font-weight: 600;
+}
+.pinball-lane.active rect {
+  fill: #2f4059;
+  stroke: #2f4059;
+}
+.pinball-lane.active text {
+  fill: #fff;
+}
+.pinball-ball circle:first-child {
+  fill: #d69c43;
+  stroke: #a66f22;
+  stroke-width: 1.5;
+  filter: drop-shadow(0 3px 3px rgba(47, 58, 75, 0.28));
+}
+.pinball-ball-shine {
+  fill: rgba(255, 255, 255, 0.72);
+  stroke: none;
+}
+.pinball-board.dropping .pinball-ball {
+  filter: drop-shadow(0 4px 4px rgba(47, 58, 75, 0.18));
+}
+.pinball-board.landed .pinball-ball circle:first-child {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pinball-land 0.34s ease-out;
+}
+.pinball-drop {
+  margin-top: 2px;
+}
 .player-setup h2 {
   font-size: 22px;
 }
@@ -1781,6 +1907,17 @@ p {
     transform: rotate(3deg) translateY(3px);
   }
 }
+@keyframes pinball-land {
+  0% {
+    transform: scale(1);
+  }
+  55% {
+    transform: scale(1.22, 0.78);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
 @media (max-width: 800px) {
   .settings-layout {
     grid-template-columns: 1fr;
@@ -1874,6 +2011,12 @@ p {
   }
   .dice-card-art {
     width: 65px;
+  }
+  .pinball-board {
+    margin-top: 14px;
+  }
+  .pinball-lane text {
+    font-size: 10px;
   }
   .right-column .cup-sketch {
     right: 15px;

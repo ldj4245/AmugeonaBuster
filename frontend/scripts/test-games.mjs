@@ -15,8 +15,9 @@ const output = ts.transpileModule(source, {
 const { randomInt, resolveScores, diceContenders, games } = await import(
   `data:text/javascript;base64,${Buffer.from(output).toString("base64")}`
 );
-assert.equal(games.length, 5);
+assert.equal(games.length, 6);
 assert.equal(games[0].id, "dice");
+assert.equal(games[1].id, "pinball");
 const diceScores = [
   { name: "A", value: 12 },
   { name: "B", value: 2 },
@@ -75,5 +76,5 @@ assert.equal(
   "초과",
 );
 console.log(
-  "PASS: 5 games, dice high/low and rerolls, random ranges, loser selection, timing error.",
+  "PASS: 6 games, pinball included, dice high/low and rerolls, random ranges, loser selection, timing error.",
 );

@@ -14,6 +14,7 @@ import { games, GameId, GameResult } from "./gameLogic";
 import { TimedGame } from "./TimedGame";
 import { ChanceGame } from "./ChanceGame";
 import { DiceGame } from "./DiceGame";
+import { PinballGame } from "./PinballGame";
 
 interface History {
   game: string;
@@ -86,6 +87,8 @@ export const GamesPage = (): React.JSX.Element => {
   const losingRule =
     selected === "dice"
       ? `${rule === "high" ? "높은" : "낮은"} 합계가 사기 · 동점자는 재경기`
+      : selected === "pinball"
+        ? "공이 도착한 칸의 사람"
       : selected === "timer"
         ? "5초와의 차이가 가장 큰 사람"
         : selected === "reaction"
@@ -146,6 +149,16 @@ export const GamesPage = (): React.JSX.Element => {
                         size={78}
                         strokeWidth={1.2}
                       />
+                    ) : item.id === "pinball" ? (
+                      <span className="pinball-card-art" aria-hidden="true">
+                        <i />
+                        <span>
+                          {Array.from({ length: 12 }, (_, i) => (
+                            <b key={i} />
+                          ))}
+                        </span>
+                        <em />
+                      </span>
                     ) : item.id === "timer" ? (
                       <span className="number-art">
                         5<small>.00</small>
@@ -301,6 +314,12 @@ export const GamesPage = (): React.JSX.Element => {
                     rule={rule}
                     onFinish={finish}
                   />
+                ) : selected === "pinball" ? (
+                  <PinballGame
+                    key={round}
+                    players={players}
+                    onFinish={finish}
+                  />
                 ) : selected === "timer" || selected === "reaction" ? (
                   <TimedGame
                     key={round}
@@ -359,12 +378,18 @@ export const GamesPage = (): React.JSX.Element => {
           <div className="detail-line">
             <span>진행 방식</span>
             <strong>
-              {selected === "draw" ? "한 번에 추첨" : "한 명씩 순서대로"}
+              {selected === "draw" || selected === "pinball"
+                ? "한 번에 한 명 결정"
+                : "한 명씩 순서대로"}
             </strong>
           </div>
-          {(selected === "timer" || selected === "reaction") && (
+          {(selected === "timer" ||
+            selected === "reaction" ||
+            selected === "pinball") && (
             <p className="game-footnote">
-              최하위 동점자는 무작위로 추첨합니다.
+              {selected === "pinball"
+                ? "모든 참여자 칸의 확률은 같습니다."
+                : "최하위 동점자는 무작위로 추첨합니다."}
             </p>
           )}
           {stage === "select" && (
