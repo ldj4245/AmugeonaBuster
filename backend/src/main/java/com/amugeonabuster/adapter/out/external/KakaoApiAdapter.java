@@ -8,11 +8,14 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.net.URLEncoder;
@@ -27,11 +30,21 @@ import java.util.Map;
 public class KakaoApiAdapter implements KakaoApiPort {
 
     private final String restKey;
+    private final String publicUrl;
     private final RestClient restClient;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public KakaoApiAdapter(@Value("${kakao.api.rest-key}") String restKey) {
+    @Autowired
+    public KakaoApiAdapter(
+            @Value("${kakao.api.rest-key}") String restKey,
+            @Value("${app.public-url:https://amugeona-buster-6eda848df67d.herokuapp.com}") String publicUrl) {
+        this(restKey, publicUrl, RestClient.create());
+    }
+
+    KakaoApiAdapter(String restKey, String publicUrl, RestClient restClient) {
         this.restKey = restKey;
-        this.restClient = RestClient.create();
+        this.publicUrl = publicUrl.endsWith("/") ? publicUrl.substring(0, publicUrl.length() - 1) : publicUrl;
+        this.restClient = restClient;
     }
 
     @Getter
@@ -173,82 +186,16 @@ public class KakaoApiAdapter implements KakaoApiPort {
 
     @Override
     public boolean sendWelstoryMenuToMe(String accessToken, WelstoryMenuResult menu, String cotNo, String hallNo) {
+        return sendWelstoryMenu(accessToken, menu, cotNo, hallNo) == SendStatus.SENT;
+    }
+
+    @Override
+    public SendStatus sendWelstoryMenu(String accessToken, WelstoryMenuResult menu, String cotNo, String hallNo) {
         log.info("Sending Welstory menu to KakaoTalk. Cafeteria: {}", menu.getCafeteriaName());
 
         try {
-            String encodedLoc = URLEncoder.encode(menu.getCafeteriaName(), StandardCharsets.UTF_8);
-            String viewMenuUrl = "https://amugeona-buster-6eda848df67d.herokuapp.com/?view-menu=true&cotNo="
-                + cotNo + "&hallNo=" + hallNo + "&name=" + encodedLoc;
-
-            Map<String, Object> template = new LinkedHashMap<>();
-            template.put("object_type", "list");
-            template.put("header_title", menu.getCafeteriaName());
-
-            Map<String, String> headerLink = new LinkedHashMap<>();
-            headerLink.put("web_url", viewMenuUrl);
-            headerLink.put("mobile_web_url", viewMenuUrl);
-            template.put("header_link", headerLink);
-
-            List<Map<String, Object>> contents = new ArrayList<>();
-            List<WelstoryMenuResult.CourseMenu> courses = menu.getCourses();
-
-            if (courses == null || courses.isEmpty()) {
-                Map<String, Object> item = new LinkedHashMap<>();
-                item.put("title", "등록된 식단 없음");
-                item.put("description", menu.getMessage() == null || menu.getMessage().isBlank()
-                        ? "등록된 메뉴가 없습니다."
-                        : menu.getMessage());
-                item.put("link", headerLink);
-                contents.add(item);
-            } else {
-                int limit = Math.min(courses.size(), 3);
-                for (int i = 0; i < limit; i++) {
-                    WelstoryMenuResult.CourseMenu course = courses.get(i);
-                    Map<String, Object> item = new LinkedHashMap<>();
-
-                    String title = cleanCourseTitle(course.getCourseName());
-                    if (course.getCalories() > 0) {
-                        title += " · " + course.getCalories() + "kcal";
-                    }
-                    item.put("title", truncate(title, 40));
-                    item.put("description", compactMenuDetails(course.getMenuDetails()));
-
-                    if (course.getImageUrl() != null && !course.getImageUrl().isBlank()) {
-                        item.put("image_url", course.getImageUrl());
-                    }
-                    item.put("link", headerLink);
-                    contents.add(item);
-                }
-            }
-            template.put("contents", contents);
-
-            List<Map<String, Object>> buttons = new ArrayList<>();
-
-            Map<String, Object> btnEscape = new LinkedHashMap<>();
-            btnEscape.put("title", "다른 식당 찾기");
-
-            Map<String, String> escapeLink = new LinkedHashMap<>();
-            String escapeUrl = "https://amugeona-buster-6eda848df67d.herokuapp.com/?escape=true&location=" + encodedLoc;
-            escapeLink.put("web_url", escapeUrl);
-            escapeLink.put("mobile_web_url", escapeUrl);
-
-            btnEscape.put("link", escapeLink);
-            buttons.add(btnEscape);
-
-            Map<String, Object> btnSettings = new LinkedHashMap<>();
-            btnSettings.put("title", "전체 메뉴 보기");
-
-            Map<String, String> settingsLink = new LinkedHashMap<>();
-            settingsLink.put("web_url", viewMenuUrl);
-            settingsLink.put("mobile_web_url", viewMenuUrl);
-
-            btnSettings.put("link", settingsLink);
-            buttons.add(btnSettings);
-
-            template.put("buttons", buttons);
-
-            ObjectMapper mapper = new ObjectMapper();
-            String templateJson = mapper.writeValueAsString(template);
+            Map<String, Object> template = buildTemplate(menu, cotNo, hallNo);
+            String templateJson = objectMapper.writeValueAsString(template);
 
             MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
             body.add("template_object", templateJson);
@@ -262,12 +209,107 @@ public class KakaoApiAdapter implements KakaoApiPort {
                 .toBodilessEntity();
 
             log.info("Successfully sent Welstory menu KakaoTalk message.");
-            return true;
+            return SendStatus.SENT;
 
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
+                log.warn("KakaoTalk memo send returned 401 Unauthorized.");
+                return SendStatus.UNAUTHORIZED;
+            }
+            log.error("KakaoTalk memo send failed with HTTP {}: {}", e.getStatusCode(), e.getMessage());
+            return SendStatus.FAILED;
         } catch (Exception e) {
-            log.error("Failed to send KakaoTalk LIST memo message: {}", e.getMessage(), e);
-            return false;
+            log.error("Failed to send KakaoTalk memo message: {}", e.getMessage(), e);
+            return SendStatus.FAILED;
         }
+    }
+
+    Map<String, Object> buildTemplate(WelstoryMenuResult menu, String cotNo, String hallNo) {
+        String cafeteriaName = menu.getCafeteriaName() != null ? menu.getCafeteriaName() : "구내식당";
+        String encodedLoc = URLEncoder.encode(cafeteriaName, StandardCharsets.UTF_8);
+        String viewMenuUrl = publicUrl + "/?view-menu=true&cotNo="
+            + cotNo + "&hallNo=" + hallNo + "&name=" + encodedLoc;
+        String escapeUrl = publicUrl + "/?escape=true&location=" + encodedLoc;
+
+        Map<String, String> headerLink = new LinkedHashMap<>();
+        headerLink.put("web_url", viewMenuUrl);
+        headerLink.put("mobile_web_url", viewMenuUrl);
+
+        Map<String, String> escapeLink = new LinkedHashMap<>();
+        escapeLink.put("web_url", escapeUrl);
+        escapeLink.put("mobile_web_url", escapeUrl);
+
+        List<Map<String, Object>> buttons = new ArrayList<>();
+        Map<String, Object> btnEscape = new LinkedHashMap<>();
+        btnEscape.put("title", "다른 식당 찾기");
+        btnEscape.put("link", escapeLink);
+        buttons.add(btnEscape);
+
+        Map<String, Object> btnViewAll = new LinkedHashMap<>();
+        btnViewAll.put("title", "전체 메뉴 보기");
+        btnViewAll.put("link", headerLink);
+        buttons.add(btnViewAll);
+
+        List<WelstoryMenuResult.CourseMenu> courses = menu.getCourses();
+
+        // 카카오 list 템플릿은 contents 항목이 최소 2개 이상(2~3개)일 때만 허용됨.
+        // 단일 코스(아침·저녁 단품 등) 또는 빈 코스는 text 템플릿으로 전송해 400 오류를 방지한다.
+        if (courses == null || courses.size() < 2) {
+            Map<String, Object> textTemplate = new LinkedHashMap<>();
+            textTemplate.put("object_type", "text");
+            textTemplate.put("text", buildSingleOrEmptyText(cafeteriaName, menu, courses));
+            textTemplate.put("link", headerLink);
+            textTemplate.put("buttons", buttons);
+            return textTemplate;
+        }
+
+        Map<String, Object> listTemplate = new LinkedHashMap<>();
+        listTemplate.put("object_type", "list");
+        listTemplate.put("header_title", cafeteriaName);
+        listTemplate.put("header_link", headerLink);
+
+        List<Map<String, Object>> contents = new ArrayList<>();
+        int limit = Math.min(courses.size(), 3);
+        for (int i = 0; i < limit; i++) {
+            WelstoryMenuResult.CourseMenu course = courses.get(i);
+            Map<String, Object> item = new LinkedHashMap<>();
+
+            String title = cleanCourseTitle(course.getCourseName());
+            if (course.getCalories() > 0) {
+                title += " · " + course.getCalories() + "kcal";
+            }
+            item.put("title", truncate(title, 40));
+            item.put("description", compactMenuDetails(course.getMenuDetails()));
+
+            if (course.getImageUrl() != null && !course.getImageUrl().isBlank()) {
+                item.put("image_url", course.getImageUrl());
+            }
+            item.put("link", headerLink);
+            contents.add(item);
+        }
+
+        listTemplate.put("contents", contents);
+        listTemplate.put("buttons", buttons);
+        return listTemplate;
+    }
+
+    private static String buildSingleOrEmptyText(
+            String cafeteriaName,
+            WelstoryMenuResult menu,
+            List<WelstoryMenuResult.CourseMenu> courses) {
+        if (courses == null || courses.isEmpty()) {
+            String desc = (menu.getMessage() == null || menu.getMessage().isBlank())
+                ? "등록된 메뉴가 없습니다."
+                : menu.getMessage();
+            return truncate("[" + cafeteriaName + "]\n" + desc, 200);
+        }
+        WelstoryMenuResult.CourseMenu course = courses.get(0);
+        String title = cleanCourseTitle(course.getCourseName());
+        if (course.getCalories() > 0) {
+            title += " · " + course.getCalories() + "kcal";
+        }
+        String details = compactMenuDetails(course.getMenuDetails());
+        return truncate("[" + cafeteriaName + "]\n" + truncate(title, 60) + "\n" + details, 200);
     }
 
     static String cleanCourseTitle(String value) {

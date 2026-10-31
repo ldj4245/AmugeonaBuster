@@ -13,11 +13,13 @@ const pages = [
 ] as const;
 const initialPage = (): Page => {
   const params = new URLSearchParams(window.location.search);
-  if (params.has("code") || params.has("welstory") || params.has("error"))
+  if (params.has("code") || params.has("error"))
     return "settings";
   const hash = window.location.hash.slice(1);
   if (["meals", "games", "rooms", "settings"].includes(hash))
     return hash as Page;
+  if (params.has("welstory"))
+    return "settings";
   return params.has("room") || params.has("escape") ? "rooms" : "meals";
 };
 export const App = (): React.JSX.Element => {

@@ -7,9 +7,18 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "welstory_menu_reviews", indexes = {
-    @Index(name = "idx_review_lookup", columnList = "cafeteriaName, menuDate")
-})
+@Table(
+    name = "welstory_menu_reviews",
+    indexes = {
+        @Index(name = "idx_review_lookup", columnList = "cafeteriaName, menuDate")
+    },
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_review_daily_user",
+            columnNames = {"cafeteriaName", "menuDate", "courseName", "userFingerprint"}
+        )
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

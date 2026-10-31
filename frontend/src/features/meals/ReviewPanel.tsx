@@ -9,6 +9,14 @@ interface Review {
   rating: number;
   courseName: string;
 }
+function createClientId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
 export const ReviewPanel = ({
   course,
   cafeteriaName,
@@ -82,7 +90,7 @@ export const ReviewPanel = ({
           try {
             let fingerprint = readLocal<string>("club-review-id", "");
             if (!fingerprint) {
-              fingerprint = crypto.randomUUID();
+              fingerprint = createClientId();
               saveLocal("club-review-id", fingerprint);
             }
             const saved = await post<Review>("/welstory/reviews", {

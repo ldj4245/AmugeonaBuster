@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @RestController
@@ -58,14 +59,14 @@ public class WelstoryAlertController {
                     settings.getCafeteriaName(), settings.getScheduledDays(), settings.getScheduledTime(), settings.isEnabled());
         }
     }
-    public record SaveSettingsRequest(String cotNo, String hallNo, String cafeteriaName,
-            String scheduledDays, String scheduledTime, boolean isEnabled) {}
+
     public record TokenExchangeRequest(String code, String state, String redirectUri) {}
+    public record SaveSettingsRequest(String cotNo, String hallNo, String scheduledDays, String scheduledTime, boolean isEnabled) {}
     public record CafeteriaPreset(String name, String cotNo, String hallNo) {}
 
     private WelstoryAlertSettings current(HttpSession session) {
         Object id = session.getAttribute(USER);
-        if (!(id instanceof String)) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "카카오 연결이 필요합니다.");
+        if (id == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         return query.getSettings((String) id).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
     }
 
@@ -86,8 +87,13 @@ public class WelstoryAlertController {
     @PostMapping("/token-exchange")
     public SettingsResponse exchange(@RequestBody TokenExchangeRequest request, HttpServletRequest servletRequest) {
         HttpSession session = servletRequest.getSession();
-        if (request.state() == null || !request.state().equals(session.getAttribute(STATE))
-                || !request.redirectUri().equals(session.getAttribute(REDIRECT))) {
+        Object sessionState = session != null ? session.getAttribute(STATE) : null;
+        Object sessionRedirect = session != null ? session.getAttribute(REDIRECT) : null;
+
+        if (request == null || request.state() == null || request.redirectUri() == null
+                || sessionState == null || sessionRedirect == null
+                || !request.state().equals(sessionState)
+                || !request.redirectUri().equals(sessionRedirect)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "연결 요청이 만료됐어요. 카카오 연결을 다시 시작해 주세요.");
         }
         session.removeAttribute(STATE);

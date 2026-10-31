@@ -47,8 +47,9 @@ public class WelstoryMenuService implements GetTodayMenuQuery {
     /**
      * 알림 시간대별로 식단을 필터링하여 매칭되는 식단만 반환합니다.
      * 아침: 00:00 ~ 08:59 (hour < 9)
-     * 점심: 09:00 ~ 12:59 (hour >= 9 && hour < 13)
-     * 저녁/야식: 13:00 ~ 23:59 (hour >= 13)
+     * 점심: 09:00 ~ 12:59 (9 <= hour < 13)
+     * 저녁: 13:00 ~ 19:59 (13 <= hour < 20)
+     * 야식: 20:00 ~ 23:59 (hour >= 20)
      */
     @Override
     public WelstoryMenuResult filterMenuByTime(WelstoryMenuResult menu, String scheduledTime) {
@@ -63,6 +64,8 @@ public class WelstoryMenuService implements GetTodayMenuQuery {
                 int hour = Integer.parseInt(parts[0]);
                 if (hour < 9) {
                     targetLabel = "아침";
+                } else if (hour >= 20) {
+                    targetLabel = "야식";
                 } else if (hour >= 13) {
                     targetLabel = "저녁";
                 }
@@ -71,7 +74,7 @@ public class WelstoryMenuService implements GetTodayMenuQuery {
             log.warn("Failed to parse scheduledTime: {}, defaulting to 점심", scheduledTime, e);
         }
 
-        log.info("Filtering courses for cafeteria: {} matching time label: '{}' (Scheduled: {})", 
+        log.info("Filtering courses for cafeteria: {} matching time label: '{}' (Scheduled: {})",
             menu.getCafeteriaName(), targetLabel, scheduledTime);
 
         List<CourseMenu> filteredCourses = new ArrayList<>();
@@ -83,7 +86,7 @@ public class WelstoryMenuService implements GetTodayMenuQuery {
         }
 
         if (filteredCourses.isEmpty()) {
-            log.warn("No courses matched the filter '{}'. Returning original courses as fallback.", targetLabel);
+            log.warn("No courses matched the filter '{}'. Returning EMPTY status.", targetLabel);
             return WelstoryMenuResult.builder().cafeteriaName(menu.getCafeteriaName())
                     .dateStr(menu.getDateStr()).courses(List.of()).status("EMPTY").build();
         }

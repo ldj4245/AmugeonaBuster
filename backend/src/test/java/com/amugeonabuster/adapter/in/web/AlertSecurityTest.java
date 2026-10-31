@@ -41,8 +41,19 @@ class AlertSecurityTest {
     void oauthRejectsForgedStateBeforeCallingProvider() {
         var request = new MockHttpServletRequest();
         request.getSession().setAttribute("kakaoState", "expected");
+        request.getSession().setAttribute("kakaoRedirect", "https://example.com");
         assertThatThrownBy(() -> controller.exchange(new WelstoryAlertController.TokenExchangeRequest(
                 "code", "forged", "https://example.com"), request)).isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(auth);
+    }
+
+    @Test
+    void oauthRejectsNullRedirectUriWithoutNullPointerException() {
+        var request = new MockHttpServletRequest();
+        request.getSession().setAttribute("kakaoState", "expected");
+        request.getSession().setAttribute("kakaoRedirect", "https://example.com");
+        assertThatThrownBy(() -> controller.exchange(new WelstoryAlertController.TokenExchangeRequest(
+                "code", "expected", null), request)).isInstanceOf(ResponseStatusException.class);
         verifyNoInteractions(auth);
     }
 }

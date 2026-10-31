@@ -19,6 +19,105 @@ interface KakaoMapProps {
   longitude?: number;
 }
 
+function resolveSafePlaceUrl(rawUrl?: string): string | null {
+  if (!rawUrl) return null;
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+      return parsed.toString();
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function buildInfoWindowElement(res: Restaurant, index: number): HTMLDivElement {
+  const safeUrl = resolveSafePlaceUrl(res.placeUrl);
+
+  const root = document.createElement('div');
+  root.style.cssText = [
+    'padding: 12px',
+    'width: 220px',
+    'background: #ffffff',
+    'border-radius: 14px',
+    'box-shadow: 0 8px 24px rgba(0,0,0,0.12)',
+    'border: 1px solid #e5e7eb',
+    'text-align: left',
+    "font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  ].join(';');
+
+  const header = document.createElement('div');
+  header.style.cssText = 'display: flex; align-items: center; gap: 6px; margin-bottom: 6px;';
+
+  const badge = document.createElement('span');
+  badge.style.cssText = [
+    'background: #f43f5e',
+    'color: white',
+    'font-weight: 800',
+    'font-size: 10px',
+    'min-width: 18px',
+    'height: 18px',
+    'border-radius: 5px',
+    'display: flex',
+    'align-items: center',
+    'justify-content: center',
+    'padding: 0 3px',
+  ].join(';');
+  badge.textContent = String(index + 1);
+
+  const title = document.createElement('strong');
+  title.style.cssText = 'color: #111827; font-size: 13px; font-weight: 700; line-height: 1.3;';
+  title.textContent = res.name;
+
+  header.appendChild(badge);
+  header.appendChild(title);
+  root.appendChild(header);
+
+  if (res.category) {
+    const category = document.createElement('div');
+    category.style.cssText =
+      'display: inline-block; background: #fff7ed; color: #ea580c; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 10px; margin-bottom: 5px; border: 1px solid #fed7aa;';
+    category.textContent = res.category;
+    root.appendChild(category);
+  }
+
+  const address = document.createElement('div');
+  address.style.cssText = `font-size: 10px; color: #6b7280; margin-bottom: ${res.phone || safeUrl ? '6px' : '0'}; line-height: 1.4;`;
+  address.textContent = `📍 ${res.address}`;
+  root.appendChild(address);
+
+  if (res.phone) {
+    const phone = document.createElement('div');
+    phone.style.cssText = `font-size: 10px; color: #ef4444; font-weight: 600; margin-bottom: ${safeUrl ? '6px' : '0'};`;
+    phone.textContent = `📞 ${res.phone}`;
+    root.appendChild(phone);
+  }
+
+  if (safeUrl) {
+    const link = document.createElement('a');
+    link.href = safeUrl;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.style.cssText = [
+      'display: block',
+      'background: #fee2e2',
+      'color: #b91c1c',
+      'font-size: 10px',
+      'font-weight: 700',
+      'text-align: center',
+      'padding: 5px 0',
+      'border-radius: 8px',
+      'text-decoration: none',
+      'margin-top: 2px',
+    ].join(';');
+    link.textContent = '🗺️ 카카오맵에서 보기';
+    root.appendChild(link);
+  }
+
+  return root;
+}
+
 export function KakaoMap({ matchedRestaurants, location, latitude, longitude }: KakaoMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -97,7 +196,7 @@ export function KakaoMap({ matchedRestaurants, location, latitude, longitude }: 
       setHasError(false);
 
       const container = mapContainerRef.current;
-      
+
       let avgLat = 0;
       let avgLng = 0;
       let validCoordsCount = 0;
@@ -166,53 +265,8 @@ export function KakaoMap({ matchedRestaurants, location, latitude, longitude }: 
           map: map
         });
 
-        const content = `
-          <div style="
-            padding: 12px;
-            width: 220px;
-            background: #ffffff;
-            border-radius: 14px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-            border: 1px solid #e5e7eb;
-            text-align: left;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          ">
-            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-              <span style="
-                background: #f43f5e;
-                color: white;
-                font-weight: 800;
-                font-size: 10px;
-                min-width: 18px;
-                height: 18px;
-                border-radius: 5px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                padding: 0 3px;
-              ">${index + 1}</span>
-              <strong style="color: #111827; font-size: 13px; font-weight: 700; line-height: 1.3;">${res.name}</strong>
-            </div>
-            ${res.category ? `<div style="display: inline-block; background: #fff7ed; color: #ea580c; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 10px; margin-bottom: 5px; border: 1px solid #fed7aa;">${res.category}</div>` : ''}
-            <div style="font-size: 10px; color: #6b7280; margin-bottom: ${res.phone || res.placeUrl ? '6px' : '0'}; line-height: 1.4;">📍 ${res.address}</div>
-            ${res.phone ? `<div style="font-size: 10px; color: #ef4444; font-weight: 600; margin-bottom: ${res.placeUrl ? '6px' : '0'};">📞 ${res.phone}</div>` : ''}
-            ${res.placeUrl ? `<a href="${res.placeUrl}" target="_blank" style="
-              display: block;
-              background: #fee2e2;
-              color: #b91c1c;
-              font-size: 10px;
-              font-weight: 700;
-              text-align: center;
-              padding: 5px 0;
-              border-radius: 8px;
-              text-decoration: none;
-              margin-top: 2px;
-            ">🗺️ 카카오맵에서 보기</a>` : ''}
-          </div>
-        `;
-
         const infowindow = new win.kakao.maps.InfoWindow({
-          content: content,
+          content: buildInfoWindowElement(res, index),
           removable: true
         });
 
@@ -221,7 +275,7 @@ export function KakaoMap({ matchedRestaurants, location, latitude, longitude }: 
         });
       });
 
-      if (validCoordsCount > 1) {
+      if (validCoordsCount > 1 || (hasOrigin && validCoordsCount === 1)) {
         map.setBounds(bounds);
       }
 
@@ -240,16 +294,16 @@ export function KakaoMap({ matchedRestaurants, location, latitude, longitude }: 
             <Compass className="w-4 h-4 text-rose-500" />
             📍 {location} 주변 식당
           </h3>
-          
+
           <div className="flex items-center gap-1 bg-amber-50 border border-amber-200/50 text-[10px] text-amber-600 px-2 py-0.5 rounded-full font-bold">
             <AlertCircle className="w-3 h-3 text-amber-500 shrink-0" />
             지도 미리보기
           </div>
         </div>
-        
+
         <div className="w-full h-[220px] bg-slate-100 rounded-2xl border border-slate-200/60 relative overflow-hidden shadow-inner flex items-center justify-center">
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:24px_24px] opacity-40" />
-          
+
           <div className="absolute top-[30%] left-0 w-full h-4 bg-white border-y border-slate-200/50 rotate-[3deg] pointer-events-none" />
           <div className="absolute top-[70%] left-0 w-full h-6 bg-white border-y border-slate-200/50 rotate-[-2deg] pointer-events-none" />
           <div className="absolute left-[40%] top-0 w-5 h-full bg-white border-x border-slate-200/50 rotate-[12deg] pointer-events-none" />
@@ -269,7 +323,7 @@ export function KakaoMap({ matchedRestaurants, location, latitude, longitude }: 
             const offset = pinOffsets[index] || { top: '50%', left: '50%' };
 
             return (
-              <div 
+              <div
                 key={res.id}
                 className="absolute cursor-pointer group flex flex-col items-center"
                 style={{ top: offset.top, left: offset.left }}
@@ -315,8 +369,8 @@ export function KakaoMap({ matchedRestaurants, location, latitude, longitude }: 
           </div>
         )}
 
-        <div 
-          ref={mapContainerRef} 
+        <div
+          ref={mapContainerRef}
           className="w-full h-full rounded-2xl border border-slate-200/60 shadow-inner overflow-hidden"
         />
       </div>

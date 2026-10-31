@@ -21,6 +21,7 @@ export const SettingsPage = (): React.JSX.Element => {
     started.current = true;
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
+    const oauthError = params.has("error");
     const load = code
       ? post<Settings>("/welstory/token-exchange", {
           code,
@@ -28,12 +29,15 @@ export const SettingsPage = (): React.JSX.Element => {
           redirectUri: window.location.origin,
         })
       : api<Settings>("/welstory/settings");
-    if (code || params.has("error"))
+    if (code || oauthError || params.has("welstory"))
       window.history.replaceState(
         {},
         "",
         `${window.location.pathname}#settings`,
       );
+    if (oauthError) {
+      setMessage("카카오 연결이 취소되었습니다. 다시 시도해 주세요.");
+    }
     load
       .then(setSettings)
       .catch((e) => {
@@ -235,7 +239,8 @@ export const SettingsPage = (): React.JSX.Element => {
             오전 9시 전에는 아침,
             <br />
             오후 1시 전에는 점심,
-            <br />그 이후에는 저녁 식단을 보내요.
+            <br />
+            오후 8시 전에는 저녁, 그 이후에는 야식 식단을 보내요.
           </p>
           <p className="muted">
             새로 바꾼 시간과 요일은 저장해야 적용돼요. 식단을 확인할 수 없는

@@ -31,12 +31,17 @@ public class WelstoryMenuReviewService implements WelstoryMenuReviewUseCase {
         }
         if (command.getNickname() == null || command.getNickname().isBlank() || command.getNickname().length() > 20
                 || command.getComment() == null || command.getComment().isBlank() || command.getComment().length() > 500
-                || command.getCourseName() == null || command.getCourseName().isBlank()
-                || command.getCafeteriaName() == null || command.getCafeteriaName().isBlank()
-                || command.getUserFingerprint() == null || command.getUserFingerprint().isBlank()
+                || command.getCourseName() == null || command.getCourseName().isBlank() || command.getCourseName().length() > 255
+                || command.getCafeteriaName() == null || command.getCafeteriaName().isBlank() || command.getCafeteriaName().length() > 255
+                || command.getUserFingerprint() == null || command.getUserFingerprint().isBlank() || command.getUserFingerprint().length() > 255
                 || command.getMenuDate() == null) {
             throw new IllegalArgumentException("이름과 한줄평 등 필수 입력을 확인해 주세요.");
         }
+        String safeMenuDetails = command.getMenuDetails();
+        if (safeMenuDetails != null && safeMenuDetails.length() > 500) {
+            safeMenuDetails = safeMenuDetails.substring(0, 500);
+        }
+
         // 도배 차단 (1 브라우저 세션당 특정 코스에 대해 당일 딱 1회만 등록 허용)
         boolean alreadySubmitted = reviewPort.existsByCafeteriaNameAndMenuDateAndCourseNameAndUserFingerprint(
             command.getCafeteriaName(),
@@ -53,7 +58,7 @@ public class WelstoryMenuReviewService implements WelstoryMenuReviewUseCase {
             .cafeteriaName(command.getCafeteriaName())
             .menuDate(command.getMenuDate())
             .courseName(command.getCourseName())
-            .menuDetails(command.getMenuDetails())
+            .menuDetails(safeMenuDetails)
             .nickname(command.getNickname())
             .rating(command.getRating())
             .comment(command.getComment())

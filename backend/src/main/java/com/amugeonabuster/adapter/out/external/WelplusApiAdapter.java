@@ -25,6 +25,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Component
@@ -34,6 +36,7 @@ public class WelplusApiAdapter implements LoadWelstoryMenuPort {
     private volatile String cachedToken;
     private volatile long tokenExpiryTime;
     private static final String DEVICE_ID = UUID.randomUUID().toString();
+    private static final Pattern CALORIE_NUMBER_PATTERN = Pattern.compile("(\\d+(?:\\.\\d+)?)");
     private static final long MENU_CACHE_TTL_MILLIS = Duration.ofMinutes(10).toMillis();
     private static final long AVAILABLE_STALE_TTL_MILLIS = Duration.ofHours(6).toMillis();
     private static final long EMPTY_CACHE_TTL_MILLIS = Duration.ofMinutes(2).toMillis();
@@ -424,15 +427,11 @@ public class WelplusApiAdapter implements LoadWelstoryMenuPort {
             uniqueKeys.add(uniqueKey);
 
             int calories = 0;
-            if (item.has("sumKcal") && !item.get("sumKcal").isNull() && !item.get("sumKcal").asText().trim().isEmpty()) {
-                try {
-                    calories = Integer.parseInt(item.get("sumKcal").asText().replaceAll("[^0-9]", ""));
-                } catch (Exception e) {}
+            if (item.has("sumKcal") && !item.get("sumKcal").isNull()) {
+                calories = parseCalories(item.get("sumKcal").asText());
             }
             if (calories == 0 && item.has("kcal") && !item.get("kcal").isNull()) {
-                try {
-                    calories = Integer.parseInt(item.get("kcal").asText().replaceAll("[^0-9]", ""));
-                } catch (Exception e) {}
+                calories = parseCalories(item.get("kcal").asText());
             }
 
             String photoCd = item.has("photoCd") ? item.get("photoCd").asText().trim() : "";
@@ -457,6 +456,25 @@ public class WelplusApiAdapter implements LoadWelstoryMenuPort {
         }
 
         return menus;
+    }
+
+    static int parseCalories(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return 0;
+        }
+        Matcher matcher = CALORIE_NUMBER_PATTERN.matcher(raw.replace(",", ""));
+        if (!matcher.find()) {
+            return 0;
+        }
+        try {
+            double parsed = Double.parseDouble(matcher.group(1));
+            if (!Double.isFinite(parsed) || parsed <= 0) {
+                return 0;
+            }
+            return (int) Math.round(parsed);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     private List<CourseMenu> retryAfterInvalidSession(String restaurantCode, String dateStr, String mealTimeId,

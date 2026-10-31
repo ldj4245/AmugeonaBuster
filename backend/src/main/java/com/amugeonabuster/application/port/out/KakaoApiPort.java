@@ -32,6 +32,12 @@ public interface KakaoApiPort {
         private final String nickname;
     }
 
+    enum SendStatus {
+        SENT,
+        UNAUTHORIZED,
+        FAILED
+    }
+
     KakaoOAuthResponse fetchOAuthTokens(String code, String redirectUri);
 
     KakaoUserMeResponse fetchUserProfile(String accessToken);
@@ -39,4 +45,8 @@ public interface KakaoApiPort {
     TokenRefreshResult refreshOAuthTokens(String refreshToken);
 
     boolean sendWelstoryMenuToMe(String accessToken, WelstoryMenuResult menu, String cotNo, String hallNo);
+
+    default SendStatus sendWelstoryMenu(String accessToken, WelstoryMenuResult menu, String cotNo, String hallNo) {
+        return sendWelstoryMenuToMe(accessToken, menu, cotNo, hallNo) ? SendStatus.SENT : SendStatus.FAILED;
+    }
 }

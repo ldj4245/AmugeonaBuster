@@ -1,4 +1,4 @@
-name: 검사 및 Heroku 배포
+name: 빌드 및 배포
 on:
   workflow_dispatch:
   pull_request:
@@ -26,7 +26,7 @@ jobs:
   deploy:
     name: Heroku 운영 배포
     needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: vars.HEROKU_DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:

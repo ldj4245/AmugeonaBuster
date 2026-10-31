@@ -32,4 +32,18 @@ class MenuReliabilityTest {
         var meal = WelstoryMenuResult.builder().status("UNAVAILABLE").courses(List.of()).build();
         assertThat(service.filterMenuByTime(meal, "11:30").getStatus()).isEqualTo("UNAVAILABLE");
     }
+
+    @Test
+    void distinguishesDinnerAndLateNightTimeSlots() {
+        var meal = WelstoryMenuResult.builder().status("AVAILABLE").courses(List.of(
+                CourseMenu.builder().courseName("한식 (저녁)").menuDetails("된장찌개").build(),
+                CourseMenu.builder().courseName("간편식 (야식)").menuDetails("우동").build()
+        )).build();
+
+        var dinner = service.filterMenuByTime(meal, "18:30");
+        assertThat(dinner.getCourses()).extracting(CourseMenu::getCourseName).containsExactly("한식 (저녁)");
+
+        var lateNight = service.filterMenuByTime(meal, "20:30");
+        assertThat(lateNight.getCourses()).extracting(CourseMenu::getCourseName).containsExactly("간편식 (야식)");
+    }
 }

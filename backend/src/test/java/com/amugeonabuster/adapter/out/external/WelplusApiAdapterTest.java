@@ -22,4 +22,15 @@ class WelplusApiAdapterTest {
         assertThat(resolvedExpiry).isEqualTo(expiresAt * 1000 - 30_000);
         adapter.stopMenuExecutor();
     }
+
+    @Test
+    void parsesDecimalAndFormattedCalorieStringsWithoutInflatingValues() {
+        assertThat(WelplusApiAdapter.parseCalories("720.5")).isEqualTo(721);
+        assertThat(WelplusApiAdapter.parseCalories("720.4 kcal")).isEqualTo(720);
+        assertThat(WelplusApiAdapter.parseCalories("1,050 kcal")).isEqualTo(1050);
+        assertThat(WelplusApiAdapter.parseCalories("850")).isEqualTo(850);
+        assertThat(WelplusApiAdapter.parseCalories("")).isZero();
+        assertThat(WelplusApiAdapter.parseCalories(null)).isZero();
+        assertThat(WelplusApiAdapter.parseCalories("미제공")).isZero();
+    }
 }

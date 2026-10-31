@@ -4,6 +4,7 @@ import com.amugeonabuster.application.port.in.GetTodayMenuQuery;
 import com.amugeonabuster.application.port.in.GetWelstoryAlertQuery;
 import com.amugeonabuster.application.port.in.SaveWelstoryAlertCommand;
 import com.amugeonabuster.application.port.out.KakaoApiPort;
+import com.amugeonabuster.application.port.out.KakaoApiPort.SendStatus;
 import com.amugeonabuster.application.port.out.KakaoApiPort.TokenRefreshResult;
 import com.amugeonabuster.application.port.out.WelstoryAlertPort;
 import com.amugeonabuster.domain.model.WelstoryAlertSettings;
@@ -44,23 +45,24 @@ public class WelstoryAlertService implements GetWelstoryAlertQuery, SaveWelstory
 
         // 1. 식단 조회
         WelstoryMenuResult menu = menuQuery.getTodayMenu(
-            setting.getCotNo(), 
-            setting.getHallNo(), 
+            setting.getCotNo(),
+            setting.getHallNo(),
             setting.getCafeteriaName()
         );
 
-        // 2. 알림 설정 시간에 해당하는 식단만 필터링!
+        // 2. 알림 설정 시간에 해당하는 식단만 필터링 (PARTIAL 상태여도 해당 끼니 코스가 있으면 발송 허용)
         WelstoryMenuResult filteredMenu = menuQuery.filterMenuByTime(menu, setting.getScheduledTime());
-        if (!"AVAILABLE".equals(filteredMenu.getStatus()) || filteredMenu.getCourses().isEmpty()) {
+        if (!SendScheduledAlertsService.hasSendableCourses(filteredMenu)) {
             throw new IllegalArgumentException("현재 보낼 수 있는 식단이 없어요. 잠시 후 다시 확인해 주세요.");
         }
 
         // 3. 카톡 나에게 보내기 발송
-        boolean success = kakaoApiPort.sendWelstoryMenuToMe(setting.getKakaoAccessToken(), filteredMenu, setting.getCotNo(), setting.getHallNo());
-        
-        if (!success) {
-            // 토큰 갱신 시도
-            log.info("Test send failed. Attempting to refresh tokens in service...");
+        SendStatus status = kakaoApiPort.sendWelstoryMenu(
+                setting.getKakaoAccessToken(), filteredMenu, setting.getCotNo(), setting.getHallNo());
+
+        if (status == SendStatus.UNAUTHORIZED) {
+            // 401 인증 만료 시에만 토큰 갱신 시도
+            log.info("Test send returned 401. Attempting to refresh tokens in service...");
             TokenRefreshResult refreshResult = kakaoApiPort.refreshOAuthTokens(setting.getKakaoRefreshToken());
             setting.setKakaoAccessToken(refreshResult.getAccessToken());
             if (refreshResult.getRefreshToken() != null) {
@@ -69,9 +71,10 @@ public class WelstoryAlertService implements GetWelstoryAlertQuery, SaveWelstory
             welstoryAlertPort.save(setting);
 
             // 재발송 시도
-            success = kakaoApiPort.sendWelstoryMenuToMe(setting.getKakaoAccessToken(), filteredMenu, setting.getCotNo(), setting.getHallNo());
+            status = kakaoApiPort.sendWelstoryMenu(
+                    setting.getKakaoAccessToken(), filteredMenu, setting.getCotNo(), setting.getHallNo());
         }
-        return success;
+        return status == SendStatus.SENT;
     }
 
     @Override
