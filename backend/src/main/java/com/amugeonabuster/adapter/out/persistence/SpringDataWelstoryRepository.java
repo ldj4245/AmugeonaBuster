@@ -12,4 +12,6 @@ public interface SpringDataWelstoryRepository extends JpaRepository<WelstoryAler
     Optional<WelstoryAlertSettingsJpaEntity> findByKakaoId(String kakaoId);
     
     List<WelstoryAlertSettingsJpaEntity> findAllByScheduledTimeAndIsEnabledTrue(String scheduledTime);
+
+    void deleteByKakaoId(String kakaoId);
 }

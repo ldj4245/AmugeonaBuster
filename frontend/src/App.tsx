@@ -4,8 +4,9 @@ import { MealPage } from "./features/meals/MealPage";
 import { GamesPage } from "./features/games/GamesPage";
 import { RoomPage } from "./features/rooms/RoomPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
+import { AdminPage } from "./features/admin/AdminPage";
 
-type Page = "meals" | "games" | "rooms" | "settings";
+type Page = "meals" | "games" | "rooms" | "settings" | "admin";
 const pages = [
   { id: "meals", label: "식단" },
   { id: "games", label: "커피내기" },
@@ -16,7 +17,7 @@ const initialPage = (): Page => {
   if (params.has("code") || params.has("error"))
     return "settings";
   const hash = window.location.hash.slice(1);
-  if (["meals", "games", "rooms", "settings"].includes(hash))
+  if (["meals", "games", "rooms", "settings", "admin"].includes(hash))
     return hash as Page;
   if (params.has("welstory"))
     return "settings";
@@ -80,10 +81,12 @@ export const App = (): React.JSX.Element => {
         {page === "games" && <GamesPage />}
         {page === "rooms" && <RoomPage />}
         {page === "settings" && <SettingsPage />}
+        {page === "admin" && <AdminPage />}
         <footer className="footer">
           <span>아무거나 버스터</span>
           <div className="footer-links">
             <button onClick={() => navigate("settings")}>식단 알림 설정</button>
+            <button onClick={() => navigate("admin")} style={{ opacity: 0.6 }}>관리자</button>
           </div>
         </footer>
       </main>

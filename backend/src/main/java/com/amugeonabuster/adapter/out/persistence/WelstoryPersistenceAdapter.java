@@ -4,6 +4,7 @@ import com.amugeonabuster.application.port.out.WelstoryAlertPort;
 import com.amugeonabuster.domain.model.WelstoryAlertSettings;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -28,10 +29,23 @@ public class WelstoryPersistenceAdapter implements WelstoryAlertPort {
     }
 
     @Override
+    public List<WelstoryAlertSettings> findAll() {
+        return repository.findAll().stream()
+                .map(this::toDomain)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public WelstoryAlertSettings save(WelstoryAlertSettings setting) {
         WelstoryAlertSettingsJpaEntity entity = toEntity(setting);
         WelstoryAlertSettingsJpaEntity saved = repository.save(entity);
         return toDomain(saved);
+    }
+
+    @Override
+    @Transactional
+    public void deleteByKakaoId(String kakaoId) {
+        repository.deleteByKakaoId(kakaoId);
     }
 
     @Override
