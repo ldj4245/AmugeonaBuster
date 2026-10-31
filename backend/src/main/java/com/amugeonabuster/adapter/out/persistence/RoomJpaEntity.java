@@ -81,6 +81,13 @@ public class RoomJpaEntity {
         this.customMenus = customMenus != null ? customMenus : "";
     }
 
+    public void updateState(UUID hostId, RoomStatus status, String winningMenu, UUID selectedRestaurantId) {
+        if (hostId != null) this.hostId = hostId;
+        if (status != null) this.status = status;
+        this.winningMenu = winningMenu;
+        this.selectedRestaurantId = selectedRestaurantId;
+    }
+
     /**
      * 양방향 연관관계 동기화 편의 메서드
      */

@@ -1,5 +1,6 @@
 package com.amugeonabuster.application.service;
 
+import com.amugeonabuster.application.port.in.CleanupExpiredRoomsUseCase;
 import com.amugeonabuster.application.port.in.CreateRoomUseCase;
 import com.amugeonabuster.application.port.in.GetRoomUseCase;
 import com.amugeonabuster.application.port.in.JoinRoomUseCase;
@@ -17,14 +18,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
-public class RoomService implements CreateRoomUseCase, GetRoomUseCase, JoinRoomUseCase, StartVotingUseCase, SwipeMenuUseCase {
+public class RoomService implements CreateRoomUseCase, GetRoomUseCase, JoinRoomUseCase, StartVotingUseCase, SwipeMenuUseCase, CleanupExpiredRoomsUseCase {
 
     private final SaveRoomPort saveRoomPort;
     private final LoadRoomPort loadRoomPort;
@@ -35,6 +37,7 @@ public class RoomService implements CreateRoomUseCase, GetRoomUseCase, JoinRoomU
     private static final SecureRandom RANDOM = new SecureRandom();
 
     @Override
+    @Transactional
     public Room createRoom(CreateRoomCommand command) {
         String roomId = generateUniqueRoomId();
         UUID hostId = UUID.randomUUID();
@@ -50,7 +53,7 @@ public class RoomService implements CreateRoomUseCase, GetRoomUseCase, JoinRoomU
         Room room = Room.builder()
                 .id(roomId)
                 .hostId(hostId)
-                .createdAt(java.time.Instant.now())
+                .createdAt(Instant.now())
                 .location(command.getLocation())
                 .locationAddress(command.getLocationAddress())
                 .locationPlaceId(command.getLocationPlaceId())
@@ -66,6 +69,7 @@ public class RoomService implements CreateRoomUseCase, GetRoomUseCase, JoinRoomU
     }
 
     @Override
+    @Transactional
     public Room joinRoom(JoinRoomCommand command) {
         // 방 정보 획득
         Room room = loadRoomPort.loadRoom(command.getRoomId())
@@ -88,6 +92,7 @@ public class RoomService implements CreateRoomUseCase, GetRoomUseCase, JoinRoomU
     }
 
     @Override
+    @Transactional
     public Room startVoting(StartVotingCommand command) {
         Room room = loadRoomPort.loadRoom(command.getRoomId())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 방입니다. 코드: " + command.getRoomId()));
@@ -101,6 +106,10 @@ public class RoomService implements CreateRoomUseCase, GetRoomUseCase, JoinRoomU
         return room;
     }
 
+    /**
+     * 외부 카카오 API 호출(recommendRestaurantsPort.recommend)을 DB 트랜잭션 밖에서 실행하여
+     * HTTP 지연 중 DB 커넥션 및 락 점유를 원천 방지한다.
+     */
     @Override
     public Room swipeMenu(SwipeMenuCommand command) {
         Room room = loadRoomPort.loadRoom(command.getRoomId())
@@ -113,7 +122,6 @@ public class RoomService implements CreateRoomUseCase, GetRoomUseCase, JoinRoomU
         if (room.isAllMembersCompletedSwiping()) {
             room.determineWinningMenu();
 
-            // 맛집 추천 아웃고잉 포트 가동 및 바인딩
             List<Restaurant> recommended = room.hasLocationCoordinates()
                     ? recommendRestaurantsPort.recommend(room.getWinningMenu(), room.getLocation(),
                             room.getLatitude(), room.getLongitude())
@@ -130,6 +138,7 @@ public class RoomService implements CreateRoomUseCase, GetRoomUseCase, JoinRoomU
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Room> recentRooms() { return loadRoomPort.recentRooms(); }
 
     private Room requireRoom(String id) {
@@ -145,10 +154,13 @@ public class RoomService implements CreateRoomUseCase, GetRoomUseCase, JoinRoomU
     }
 
     @Override
+    @Transactional
     public Room leave(String id, UUID actor) {
         Room room = loadRoomPort.loadRoom(id).orElseThrow(() -> new IllegalArgumentException("방을 찾을 수 없습니다."));
         room.leave(actor);
-        if (!room.isExpired() && room.getStatus() == com.amugeonabuster.domain.model.RoomStatus.PLAYING && room.isAllMembersCompletedSwiping()) finishVoting(room);
+        if (!room.isExpired() && room.getStatus() == com.amugeonabuster.domain.model.RoomStatus.PLAYING && room.isAllMembersCompletedSwiping()) {
+            finishVoting(room);
+        }
         return publish(room);
     }
 
@@ -159,6 +171,9 @@ public class RoomService implements CreateRoomUseCase, GetRoomUseCase, JoinRoomU
             : recommendRestaurantsPort.recommend(room.getWinningMenu(), room.getLocation()));
     }
 
+    /**
+     * 외부 카카오 API 호출(recommendRestaurantsPort.recommend)을 DB 트랜잭션 밖에서 실행한다.
+     */
     @Override
     public Room closeVoting(String id, UUID actor) {
         Room room = requireRoom(id);
@@ -169,6 +184,7 @@ public class RoomService implements CreateRoomUseCase, GetRoomUseCase, JoinRoomU
     }
 
     @Override
+    @Transactional
     public Room selectRestaurant(String id, UUID actor, UUID restaurantId) {
         Room room = requireRoom(id);
         room.selectRestaurant(actor, restaurantId);
@@ -176,8 +192,17 @@ public class RoomService implements CreateRoomUseCase, GetRoomUseCase, JoinRoomU
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<Room> getRoom(String roomId) {
         return loadRoomPort.loadRoom(roomId);
+    }
+
+    @Override
+    @Transactional
+    public int cleanupExpiredRooms() {
+        // 24시간 이상 지난 만료 방 정리
+        Instant cutoff = Instant.now().minus(24, ChronoUnit.HOURS);
+        return saveRoomPort.deleteRoomsCreatedBefore(cutoff);
     }
 
     /**

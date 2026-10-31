@@ -28,9 +28,21 @@ public class KakaoLocalSearchAdapter implements RecommendRestaurantsPort {
     private static final int SEARCH_RADIUS_METERS = 1000;
     private static final int MAX_RESULTS = 5;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public KakaoLocalSearchAdapter(@Value("${kakao.api.rest-key}") String restKey) {
+        this(restKey, createTimeoutRestClient());
+    }
+
+    KakaoLocalSearchAdapter(String restKey, RestClient restClient) {
         this.restKey = restKey;
-        this.restClient = RestClient.create();
+        this.restClient = restClient;
+    }
+
+    static RestClient createTimeoutRestClient() {
+        var factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(java.time.Duration.ofSeconds(2));
+        factory.setReadTimeout(java.time.Duration.ofSeconds(3));
+        return RestClient.builder().requestFactory(factory).build();
     }
 
     @Override

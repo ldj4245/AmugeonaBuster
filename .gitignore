@@ -43,3 +43,6 @@ Thumbs.db
 # Generated Frontend static assets in backend
 /backend/src/main/resources/static/
 
+# Playwright & test artifacts
+.playwright-cli/
+output/

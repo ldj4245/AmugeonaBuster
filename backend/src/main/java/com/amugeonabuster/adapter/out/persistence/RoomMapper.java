@@ -87,6 +87,32 @@ public class RoomMapper {
     }
 
     /**
+     * N+1 방지를 위한 방 목록 요약 전용 도메인 변환기
+     */
+    public Room toSummaryDomainModel(RoomJpaEntity jpaEntity) {
+        if (jpaEntity == null) {
+            return null;
+        }
+
+        List<Member> domainMembers = jpaEntity.getMembers().stream()
+                .map(memberEntity -> Member.builder()
+                        .id(memberEntity.getId())
+                        .nickname(memberEntity.getNickname())
+                        .isReady(memberEntity.isReady())
+                        .build())
+                .collect(Collectors.toList());
+
+        return Room.builder()
+                .id(jpaEntity.getId())
+                .hostId(jpaEntity.getHostId())
+                .createdAt(jpaEntity.getCreatedAt())
+                .location(jpaEntity.getLocation())
+                .status(jpaEntity.getStatus())
+                .members(domainMembers)
+                .build();
+    }
+
+    /**
      * Pure Domain Model -> JPA Entity 변환 (Cascade를 위한 연관관계 설정 포함)
      */
     public RoomJpaEntity toJpaEntity(Room domainModel) {
@@ -138,22 +164,25 @@ public class RoomMapper {
 
         // 도메인 내부에 격리된 식당들을 양방향 JPA Entity 관계로 바인딩
         domainModel.getMatchedRestaurants().forEach(domainRestaurant -> {
-            RestaurantJpaEntity restaurantJpaEntity = RestaurantJpaEntity.builder()
-                    .id(domainRestaurant.getId())
-                    .name(domainRestaurant.getName())
-                    .address(domainRestaurant.getAddress())
-                    .latitude(domainRestaurant.getLatitude())
-                    .longitude(domainRestaurant.getLongitude())
-                    .phone(domainRestaurant.getPhone())
-                    .category(domainRestaurant.getCategory())
-                    .placeUrl(domainRestaurant.getPlaceUrl())
-                    .externalPlaceId(domainRestaurant.getExternalPlaceId())
-                    .distanceMeters(domainRestaurant.getDistanceMeters())
-                    .matchType(domainRestaurant.getMatchType())
-                    .build();
-            jpaEntity.addRestaurant(restaurantJpaEntity);
+            jpaEntity.addRestaurant(toRestaurantEntity(domainRestaurant));
         });
 
         return jpaEntity;
+    }
+
+    public RestaurantJpaEntity toRestaurantEntity(Restaurant domainRestaurant) {
+        return RestaurantJpaEntity.builder()
+                .id(domainRestaurant.getId())
+                .name(domainRestaurant.getName())
+                .address(domainRestaurant.getAddress())
+                .latitude(domainRestaurant.getLatitude())
+                .longitude(domainRestaurant.getLongitude())
+                .phone(domainRestaurant.getPhone())
+                .category(domainRestaurant.getCategory())
+                .placeUrl(domainRestaurant.getPlaceUrl())
+                .externalPlaceId(domainRestaurant.getExternalPlaceId())
+                .distanceMeters(domainRestaurant.getDistanceMeters())
+                .matchType(domainRestaurant.getMatchType())
+                .build();
     }
 }

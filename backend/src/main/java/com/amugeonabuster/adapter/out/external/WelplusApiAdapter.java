@@ -43,6 +43,7 @@ public class WelplusApiAdapter implements LoadWelstoryMenuPort {
     private static final long UNAVAILABLE_CACHE_TTL_MILLIS = Duration.ofSeconds(30).toMillis();
     private static final long FALLBACK_TOKEN_TTL_MILLIS = Duration.ofMinutes(8).toMillis();
     private static final long TOKEN_EXPIRY_SAFETY_MILLIS = Duration.ofSeconds(30).toMillis();
+    private static final int MAX_MENU_CACHE_SIZE = 100;
     private final Map<MenuCacheKey, CachedMenu> menuCache = new ConcurrentHashMap<>();
     private final Map<MenuCacheKey, CompletableFuture<WelstoryMenuResult>> inFlight = new ConcurrentHashMap<>();
     private final ExecutorService requestExecutor;
@@ -83,6 +84,7 @@ public class WelplusApiAdapter implements LoadWelstoryMenuPort {
     @Override
     public WelstoryMenuResult loadMenu(String cotNo, String hallNo, String cafeteriaName, LocalDate today,
             boolean forceRefresh) {
+        evictStaleCacheEntries(today);
         MenuCacheKey cacheKey = new MenuCacheKey(cotNo, hallNo, today);
         if (forceRefresh) {
             log.debug("Bypassing Welstory menu cache for {} {}", cotNo, today);
@@ -130,6 +132,24 @@ public class WelplusApiAdapter implements LoadWelstoryMenuPort {
             String dayKorean = today.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.KOREAN);
             return unavailable(cafeteriaName,
                     String.format("%d월 %d일 (%s)", today.getMonthValue(), today.getDayOfMonth(), dayKorean));
+        }
+    }
+
+    private void evictStaleCacheEntries(LocalDate today) {
+        long now = System.currentTimeMillis();
+        menuCache.entrySet().removeIf(entry -> {
+            LocalDate date = entry.getKey().date();
+            if (date != null && date.isBefore(today.minusDays(1))) {
+                return true;
+            }
+            return !entry.getValue().canFallback() && now > entry.getValue().expiresAt();
+        });
+
+        if (menuCache.size() > MAX_MENU_CACHE_SIZE) {
+            menuCache.entrySet().stream()
+                    .sorted((e1, e2) -> Long.compare(e1.getValue().expiresAt(), e2.getValue().expiresAt()))
+                    .limit(menuCache.size() - MAX_MENU_CACHE_SIZE)
+                    .forEach(entry -> menuCache.remove(entry.getKey()));
         }
     }
 

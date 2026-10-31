@@ -38,7 +38,14 @@ public class KakaoApiAdapter implements KakaoApiPort {
     public KakaoApiAdapter(
             @Value("${kakao.api.rest-key}") String restKey,
             @Value("${app.public-url:https://amugeona-buster-6eda848df67d.herokuapp.com}") String publicUrl) {
-        this(restKey, publicUrl, RestClient.create());
+        this(restKey, publicUrl, createTimeoutRestClient());
+    }
+
+    static RestClient createTimeoutRestClient() {
+        var factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(java.time.Duration.ofSeconds(2));
+        factory.setReadTimeout(java.time.Duration.ofSeconds(3));
+        return RestClient.builder().requestFactory(factory).build();
     }
 
     KakaoApiAdapter(String restKey, String publicUrl, RestClient restClient) {
