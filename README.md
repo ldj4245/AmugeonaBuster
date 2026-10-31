@@ -1,3 +1,13 @@
+---
+title: Amugeona Buster
+emoji: 🍱
+colorFrom: indigo
+colorTo: blue
+sdk: docker
+app_port: 8080
+pinned: false
+---
+
 # 아무거나 버스터
 
 점심 메뉴를 고르고, 같이 먹을 장소를 정하고, 식후 커피 내기까지 한 곳에서 해결하는 직장인용 점심 도구입니다.

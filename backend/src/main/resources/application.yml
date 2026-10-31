@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: ${PORT:8080}
   servlet:
     session:
       cookie:
@@ -39,14 +39,15 @@ spring:
         dialect: org.hibernate.dialect.H2Dialect
 
 ---
-# 🚀 운영 및 Heroku 배포 환경 (PostgreSQL)
+# 🚀 운영 및 클라우드 배포 환경 (PostgreSQL)
 spring:
   config:
     activate:
       on-profile: prod
   datasource:
-    # Heroku가 자동으로 제공하는 DB JDBC URL 바인딩
     url: ${JDBC_DATABASE_URL}
+    username: ${JDBC_DATABASE_USERNAME:}
+    password: ${JDBC_DATABASE_PASSWORD:}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
