@@ -218,15 +218,17 @@ public class WelplusApiAdapter implements LoadWelstoryMenuPort {
         }
 
         String username = System.getenv("WELSTORY_USERNAME");
+        if (username == null || username.isBlank()) username = System.getenv("WELPLUS_ID");
+        if (username == null || username.isBlank()) username = System.getProperty("WELSTORY_USERNAME");
+        if (username == null || username.isBlank()) username = System.getProperty("WELPLUS_ID");
+
         String password = System.getenv("WELSTORY_PASSWORD");
+        if (password == null || password.isBlank()) password = System.getenv("WELPLUS_PW");
+        if (password == null || password.isBlank()) password = System.getProperty("WELSTORY_PASSWORD");
+        if (password == null || password.isBlank()) password = System.getProperty("WELPLUS_PW");
 
-        if (username == null || username.isEmpty() || password == null || password.isEmpty()) {
-            username = System.getProperty("WELSTORY_USERNAME");
-            password = System.getProperty("WELSTORY_PASSWORD");
-        }
-
-        if (username == null || username.isEmpty() || password == null || password.isEmpty()) {
-            throw new IllegalStateException("Welstory credentials (WELSTORY_USERNAME, WELSTORY_PASSWORD) are not set in environment or system properties.");
+        if (username == null || username.isBlank() || password == null || password.isBlank()) {
+            throw new IllegalStateException("Welstory credentials (WELSTORY_USERNAME/WELPLUS_ID, WELSTORY_PASSWORD/WELPLUS_PW) are not set.");
         }
 
         log.info("Refreshing Welstory authentication.");
