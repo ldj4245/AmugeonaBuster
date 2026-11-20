@@ -12,11 +12,11 @@ services:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
       - key: JDBC_DATABASE_URL
-        value: jdbc:postgresql://ep-fragrant-math-a1ujvrlx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+        sync: false
       - key: JDBC_DATABASE_USERNAME
-        value: neondb_owner
+        sync: false
       - key: JDBC_DATABASE_PASSWORD
-        value: npg_lxth6W9Ibdzi
+        sync: false
       - key: KAKAO_REST_API_KEY
         sync: false
       - key: WELPLUS_ID
